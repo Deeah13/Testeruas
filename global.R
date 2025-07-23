@@ -47,14 +47,19 @@ waskita_colors <- list(
   error = "#ef4444"        # Error color
 )
 
-local_sovi_path <- file.path("sovi_data.csv")
-local_distance_path <- file.path("distance.csv")
+# Cek dan baca SOVI data
+if (file.exists("sovi_data.csv")) {
+  sovi_data <- readr::read_csv("sovi_data.csv")
+} else {
+  sovi_data <- readr::read_csv("https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/sovi_data.csv")
+}
 
-# Backup URLs jika data lokal tidak tersedia
-backup_urls <- list(
-  sovi = "https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/sovi_data.csv",
-  distance = "https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/distance.csv"
-)
+# Distance data
+if (file.exists("distance.csv")) {
+  distance_data <- readr::read_csv("distance.csv")
+} else {
+  distance_data <- readr::read_csv("https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/distance.csv")
+}
 
 # =============================================================================
 # REPORT TRACKING SYSTEM
