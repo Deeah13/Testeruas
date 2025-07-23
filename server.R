@@ -1,5 +1,5 @@
 # =============================================================================
-# WASKITA Dashboard - Server Logic - ENHANCED VERSION
+# WASKITA Dashboard - Server Logic
 # Wawasan Spasial Kerentanan Interaktif & Terpadu Analitik
 # =============================================================================
 
@@ -8,7 +8,7 @@ source("global.R")
 server <- function(input, output, session) {
   
   # =============================================================================
-  # REACTIVE VALUES - ENHANCED WITH TRACKING
+  # REACTIVE VALUES
   # =============================================================================
   
   values <- reactiveValues(
@@ -17,7 +17,6 @@ server <- function(input, output, session) {
     processed_data = NULL,
     distance_data = NULL,
     map_data = NULL,
-    indonesia_sf = NULL,
     
     # Status flags
     data_loaded = FALSE,
@@ -49,18 +48,8 @@ server <- function(input, output, session) {
     spatial_result = NULL
   )
   
-  # Initialize report tracker
-  activity_tracker <- reactiveValues(
-    data_transformations = list(),
-    visualizations_created = list(),
-    statistical_tests = list(),
-    spatial_analyses = list(),
-    analyses_performed = list(),
-    timestamp = Sys.time()
-  )
-  
   # =============================================================================
-  # STATUS UPDATE FUNCTIONS FOR LAPORAN LENGKAP - ENHANCED
+  # STATUS UPDATE FUNCTIONS FOR LAPORAN LENGKAP
   # =============================================================================
   
   update_status_ui <- function() {
@@ -146,41 +135,13 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # HELPER FUNCTION TO ADD ACTIVITIES TO TRACKER
-  # =============================================================================
-  
-  add_activity_to_tracker <- function(type, title, content, tables = NULL, plots = NULL) {
-    new_entry <- list(
-      timestamp = Sys.time(),
-      type = type,
-      title = title,
-      content = content,
-      tables = tables,
-      plots = plots
-    )
-    
-    if (type == "transformation") {
-      activity_tracker$data_transformations[[length(activity_tracker$data_transformations) + 1]] <- new_entry
-    } else if (type == "visualization") {
-      activity_tracker$visualizations_created[[length(activity_tracker$visualizations_created) + 1]] <- new_entry
-    } else if (type == "test") {
-      activity_tracker$statistical_tests[[length(activity_tracker$statistical_tests) + 1]] <- new_entry
-    } else if (type == "spatial") {
-      activity_tracker$spatial_analyses[[length(activity_tracker$spatial_analyses) + 1]] <- new_entry
-    } else {
-      activity_tracker$analyses_performed[[length(activity_tracker$analyses_performed) + 1]] <- new_entry
-    }
-  }
-  
-  # =============================================================================
-  # DATA LOADING - ENHANCED WITH GEOJSON
+  # DATA LOADING
   # =============================================================================
   
   observeEvent(input$load_data, {
     tryCatch({
       # Load data using global function
       data_result <- load_waskita_data()
-      geojson_result <- load_indonesia_geojson()
       
       if ("error" %in% names(data_result)) {
         safe_notification(data_result$error, "error")
@@ -190,31 +151,7 @@ server <- function(input, output, session) {
       values$original_data <- data_result$sovi
       values$processed_data <- data_result$sovi
       values$distance_data <- data_result$distance
-      
-      # Load geographical data
-      if ("error" %in% names(geojson_result)) {
-        safe_notification(paste("Warning GeoJSON:", geojson_result$error), "warning")
-        values$indonesia_sf <- NULL
-      } else {
-        values$indonesia_sf <- geojson_result$geojson
-        safe_notification(paste("Geographical data loaded from:", geojson_result$source), "info")
-      }
-      
       values$data_loaded <- TRUE
-      
-      # Add to activity tracker
-      add_activity_to_tracker(
-        type = "analysis",
-        title = "Data Loading",
-        content = paste(
-          "Dataset berhasil dimuat dengan informasi:",
-          paste("- Total observasi:", nrow(values$processed_data)),
-          paste("- Total variabel:", ncol(values$processed_data)),
-          paste("- Sumber data:", data_result$source),
-          paste("- Status geografis:", if(is.null(values$indonesia_sf)) "Sintetis" else geojson_result$source),
-          sep = "\n"
-        )
-      )
       
       # Update variable choices
       numeric_vars <- names(values$processed_data)[sapply(values$processed_data, is.numeric)]
@@ -258,44 +195,31 @@ server <- function(input, output, session) {
         }
       }
       
-      # Prepare spatial data
-      if (!is.null(values$indonesia_sf)) {
-        # Try to match districts between datasets
-        sovi_districts <- if("DISTRICTCODE" %in% names(values$processed_data)) {
-          values$processed_data$DISTRICTCODE
+      # Calculate spatial statistics for interpretation
+      map_data <- values$processed_data
+      if (nrow(map_data) > 0) {
+        # Generate synthetic coordinates for demonstration
+        set.seed(123)
+        lat_range <- c(-11, 6)  # Indonesia latitude range
+        lon_range <- c(95, 141)  # Indonesia longitude range
+        
+        map_data$lat <- runif(nrow(map_data), lat_range[1], lat_range[2])
+        map_data$lon <- runif(nrow(map_data), lon_range[1], lon_range[2])
+        
+        # Create proper district identifier
+        if("DISTRICTCODE" %in% names(values$processed_data)) {
+          map_data$district_id <- values$processed_data$DISTRICTCODE
         } else {
-          paste0("DIST_", sprintf("%03d", 1:nrow(values$processed_data)))
+          map_data$district_id <- paste0("District_", 1:nrow(map_data))
         }
         
-        # Ensure indonesia_sf has matching district codes
-        if (!"DISTRICTCODE" %in% names(values$indonesia_sf)) {
-          values$indonesia_sf$DISTRICTCODE <- paste0("DIST_", sprintf("%03d", 1:nrow(values$indonesia_sf)))
-        }
+        values$map_data <- map_data
         
-        # Create choropleth-ready data
-        values$map_data <- values$indonesia_sf
-        
-        cat("=== ENHANCED SPATIAL DATA LOADED ===\n")
-        cat("   - Total districts in GeoJSON:", nrow(values$indonesia_sf), "\n")
-        cat("   - Total districts in SoVI:", nrow(values$processed_data), "\n")
-        cat("   - Geographical source:", geojson_result$source, "\n")
-      } else {
-        # Fallback to synthetic coordinates
-        map_data <- values$processed_data
-        if (nrow(map_data) > 0) {
-          set.seed(123)
-          lat_range <- c(-11, 6)
-          lon_range <- c(95, 141)
-          
-          map_data$lat <- runif(nrow(map_data), lat_range[1], lat_range[2])
-          map_data$lon <- runif(nrow(map_data), lon_range[1], lon_range[2])
-          
-          if(!"DISTRICTCODE" %in% names(values$processed_data)) {
-            map_data$DISTRICTCODE <- paste0("DIST_", sprintf("%03d", 1:nrow(map_data)))
-          }
-          
-          values$map_data <- map_data
-        }
+        # Log spatial analysis info
+        cat("=== SPATIAL DATA LOADED ===\n")
+        cat("   - Total observasi:", nrow(map_data), "\n")
+        cat("   - Koordinat latitude range:", round(min(map_data$lat), 3), "to", round(max(map_data$lat), 3), "\n")
+        cat("   - Koordinat longitude range:", round(min(map_data$lon), 3), "to", round(max(map_data$lon), 3), "\n")
       }
       
       safe_notification(paste("Data berhasil dimuat! Source:", data_result$source), "success")
@@ -314,15 +238,13 @@ server <- function(input, output, session) {
   # Data summary
   output$data_summary <- renderPrint({
     if (values$data_loaded) {
-      cat("Dataset WASKITA - Enhanced Version\n")
-      cat("===================================\n")
+      cat("Dataset WASKITA\n")
+      cat("================\n")
       cat("Baris:", nrow(values$processed_data), "\n")
       cat("Kolom:", ncol(values$processed_data), "\n")
       cat("Missing Values:", sum(is.na(values$processed_data)), "\n")
       cat("Numerik:", sum(sapply(values$processed_data, is.numeric)), "\n")
       cat("Kategorikal:", sum(sapply(values$processed_data, function(x) is.character(x) | is.factor(x))), "\n")
-      cat("Spatial Data:", if(is.null(values$indonesia_sf)) "Synthetic coordinates" else "GeoJSON loaded", "\n")
-      cat("Distance Matrix:", if(is.null(values$distance_data)) "Not available" else paste(nrow(values$distance_data), "x", ncol(values$distance_data)), "\n")
     }
   })
   
@@ -356,7 +278,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # TRANSFORMASI DATA - ENHANCED WITH TRACKING
+  # TRANSFORMASI DATA
   # =============================================================================
   
   observeEvent(input$apply_transformation, {
@@ -412,25 +334,6 @@ server <- function(input, output, session) {
       values$processed_data[[new_col_name]] <- transformed_data
       values$transformation_done <- TRUE
       
-      # Add to activity tracker
-      stats_content <- paste(
-        paste("Variabel asli:", var_name),
-        paste("Metode transformasi:", method),
-        paste("Variabel baru:", new_col_name),
-        paste("Mean awal:", round(mean(original_data, na.rm = TRUE), 4)),
-        paste("Mean setelah:", round(mean(transformed_data, na.rm = TRUE), 4)),
-        paste("SD awal:", round(sd(original_data, na.rm = TRUE), 4)),
-        paste("SD setelah:", round(sd(transformed_data, na.rm = TRUE), 4)),
-        sep = "\n"
-      )
-      
-      add_activity_to_tracker(
-        type = "transformation",
-        title = paste("Transformasi", method, "pada", var_name),
-        content = stats_content,
-        tables = stats_content
-      )
-      
       # Update choices
       numeric_vars <- names(values$processed_data)[sapply(values$processed_data, is.numeric)]
       updateSelectInput(session, "transform_variable", choices = numeric_vars)
@@ -464,7 +367,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # KATEGORISASI DATA - ENHANCED WITH TRACKING
+  # KATEGORISASI DATA
   # =============================================================================
   
   observeEvent(input$apply_categorization, {
@@ -496,25 +399,6 @@ server <- function(input, output, session) {
       new_col_name <- paste0(var_name, "_cat")
       values$processed_data[[new_col_name]] <- categorized_var
       values$categorization_done <- TRUE
-      
-      # Add to activity tracker
-      table_result <- table(categorized_var, useNA = "ifany")
-      stats_content <- paste(
-        paste("Variabel asli:", var_name),
-        paste("Metode kategorisasi:", input$categorize_method),
-        paste("Variabel kategorikal:", new_col_name),
-        paste("Jumlah kategori:", length(labels)),
-        "Distribusi kategori:",
-        paste(capture.output(print(table_result)), collapse = "\n"),
-        sep = "\n"
-      )
-      
-      add_activity_to_tracker(
-        type = "transformation",
-        title = paste("Kategorisasi", input$categorize_method, "pada", var_name),
-        content = stats_content,
-        tables = stats_content
-      )
       
       # Update choices
       categorical_vars <- names(values$processed_data)[sapply(values$processed_data, function(x) is.character(x) | is.factor(x))]
@@ -552,7 +436,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # ANALISIS DESKRIPTIF - ENHANCED WITH TRACKING
+  # ANALISIS DESKRIPTIF
   # =============================================================================
   
   # Check if variable is numeric
@@ -569,41 +453,6 @@ server <- function(input, output, session) {
     
     values$current_desc_variable <- input$desc_variable
     values$desc_generated <- TRUE
-    
-    # Add to activity tracker
-    var_data <- values$processed_data[[input$desc_variable]]
-    
-    if (is.numeric(var_data)) {
-      stats_content <- paste(
-        paste("Variabel:", input$desc_variable),
-        paste("Tipe visualisasi:", input$desc_chart_type),
-        paste("N:", sum(!is.na(var_data))),
-        paste("Missing:", sum(is.na(var_data))),
-        paste("Mean:", round(mean(var_data, na.rm = TRUE), 4)),
-        paste("Median:", round(median(var_data, na.rm = TRUE), 4)),
-        paste("SD:", round(sd(var_data, na.rm = TRUE), 4)),
-        paste("Min:", round(min(var_data, na.rm = TRUE), 4)),
-        paste("Max:", round(max(var_data, na.rm = TRUE), 4)),
-        sep = "\n"
-      )
-    } else {
-      tbl <- table(var_data, useNA = "ifany")
-      stats_content <- paste(
-        paste("Variabel:", input$desc_variable),
-        paste("Tipe visualisasi:", input$desc_chart_type),
-        paste("Jumlah kategori:", length(tbl)),
-        "Distribusi:",
-        paste(capture.output(print(tbl)), collapse = "\n"),
-        sep = "\n"
-      )
-    }
-    
-    add_activity_to_tracker(
-      type = "visualization",
-      title = paste("Analisis Deskriptif -", input$desc_variable),
-      content = stats_content,
-      tables = stats_content
-    )
   })
   
   output$desc_generated <- reactive({
@@ -786,7 +635,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # VISUALISASI MULTIVARIAT - ENHANCED WITH TRACKING
+  # VISUALISASI MULTIVARIAT
   # =============================================================================
   
   observeEvent(input$generate_viz, {
@@ -794,25 +643,6 @@ server <- function(input, output, session) {
     
     values$current_viz_type <- input$viz_type
     values$viz_generated <- TRUE
-    
-    # Add to activity tracker
-    viz_content <- switch(input$viz_type,
-                          "scatter" = paste("Scatter plot:", input$scatter_x, "vs", input$scatter_y),
-                          "correlation" = "Correlation heatmap untuk semua variabel numerik",
-                          "boxplot_group" = paste("Boxplot", input$boxplot_numeric, "by", input$boxplot_group),
-                          "histogram_overlay" = paste("Histogram overlay untuk", length(input$hist_variables), "variabel")
-    )
-    
-    add_activity_to_tracker(
-      type = "visualization",
-      title = paste("Visualisasi Multivariat -", input$viz_type),
-      content = paste(
-        paste("Jenis visualisasi:", input$viz_type),
-        viz_content,
-        paste("Timestamp:", Sys.time()),
-        sep = "\n"
-      )
-    )
   })
   
   output$viz_generated <- reactive({
@@ -1008,37 +838,41 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # PETA SPASIAL - ENHANCED WITH REAL INDONESIA GEOJSON
+  # PETA SPASIAL - FIXED
   # =============================================================================
-  
-  observe({
-    tryCatch({
-      values$indonesia_sf <- st_read("D:/Perkuliahan Tingkat 2 Semester 4/WASKITA2/data/indonesia511.geojson", quiet = TRUE)
-    }, error = function(e) {
-      values$indonesia_sf <- NULL
-      safe_notification("Gagal membaca file GeoJSON. Pastikan nama dan path file benar.", "error")
-    })
-  })
   
   observeEvent(input$generate_map, {
     req(values$processed_data, input$map_variable)
     
     tryCatch({
-      values$map_generated <- TRUE
-      
-      # Add to activity tracker
-      add_activity_to_tracker(
-        type = "spatial",
-        title = paste("Peta Distribusi Spasial -", input$map_variable),
-        content = paste(
-          paste("Variabel yang dipetakan:", input$map_variable),
-          paste("Tipe peta:", input$map_type),
-          paste("Skema warna:", input$color_palette),
-          paste("Jumlah kelas:", input$map_bins),
-          paste("Sumber geografis:", if(is.null(values$indonesia_sf)) "Synthetic" else "GeoJSON"),
-          sep = "\n"
+      # Use existing map data with coordinates
+      if (is.null(values$map_data)) {
+        # Generate synthetic coordinates for demonstration
+        n_obs <- nrow(values$processed_data)
+        set.seed(123)
+        
+        # Create Indonesia-like coordinates
+        lat_range <- c(-11, 6)  # Indonesia latitude range
+        lon_range <- c(95, 141)  # Indonesia longitude range
+        
+        map_data <- data.frame(
+          lat = runif(n_obs, lat_range[1], lat_range[2]),
+          lon = runif(n_obs, lon_range[1], lon_range[2]),
+          value = values$processed_data[[input$map_variable]],
+          district_id = if("DISTRICTCODE" %in% names(values$processed_data)) {
+            values$processed_data$DISTRICTCODE 
+          } else { 
+            paste0("District_", 1:n_obs) 
+          },
+          stringsAsFactors = FALSE
         )
-      )
+        values$map_data <- map_data
+      } else {
+        # Update existing map data with new variable
+        values$map_data$value <- values$processed_data[[input$map_variable]]
+      }
+      
+      values$map_generated <- TRUE
       
       safe_notification("Peta berhasil dibuat!", "success")
       
@@ -1052,235 +886,90 @@ server <- function(input, output, session) {
   })
   outputOptions(output, "map_generated", suspendWhenHidden = FALSE)
   
-  # Enhanced spatial map output with real Indonesia GeoJSON
+  # Fixed spatial map output
   output$spatial_map <- renderLeaflet({
-    if (values$map_generated && !is.null(input$map_variable)) {
+    if (values$map_generated && !is.null(values$map_data)) {
+      map_data <- values$map_data
       
-      # Get the variable data
-      var_data <- values$processed_data[[input$map_variable]]
+      # Create color palette
+      pal <- colorNumeric(palette = input$color_palette, domain = map_data$value)
       
-      # Create map based on available spatial data
-      if (!is.null(values$indonesia_sf)) {
-        # Use real Indonesia GeoJSON
-        tryCatch({
-          # Merge spatial data with variable data
-          merged_data <- create_choropleth_data(values$processed_data, values$indonesia_sf, input$map_variable)
-          
-          if (!is.null(merged_data) && input$map_variable %in% names(merged_data)) {
-            # Create color palette
-            pal <- colorQuantile(palette = input$color_palette, 
-                                 domain = merged_data[[input$map_variable]], 
-                                 n = input$map_bins,
-                                 na.color = "#808080")
-            
-            # Create leaflet map with choropleth
-            m <- leaflet(merged_data) %>%
-              addTiles() %>%
-              setView(lng = 118, lat = -2, zoom = 5)
-            
-            if (input$map_type == "choropleth") {
-              m <- m %>%
-                addPolygons(
-                  fillColor = ~pal(get(input$map_variable)),
-                  weight = 1,
-                  opacity = 1,
-                  color = "white",
-                  dashArray = "3",
-                  fillOpacity = 0.8,
-                  highlight = highlightOptions(
-                    weight = 3,
-                    color = "#666",
-                    dashArray = "",
-                    fillOpacity = 0.9,
-                    bringToFront = TRUE
-                  ),
-                  popup = ~paste(
-                    "<strong>District:</strong>", DISTRICTCODE, "<br>",
-                    "<strong>", input$map_variable, ":</strong>", 
-                    round(get(input$map_variable), 3)
-                  )
-                ) %>%
-                addLegend(
-                  pal = pal,
-                  values = ~get(input$map_variable),
-                  title = input$map_variable,
-                  position = "bottomright",
-                  opacity = 0.8
-                )
-            }
-            
-            return(m)
-            
-          } else {
-            # Fallback to point-based visualization
-            map_data <- values$processed_data
-            map_data$lat <- runif(nrow(map_data), -11, 6)
-            map_data$lon <- runif(nrow(map_data), 95, 141)
-            map_data$value <- var_data
-            
-            pal <- colorNumeric(palette = input$color_palette, domain = map_data$value)
-            
-            m <- leaflet(map_data) %>%
-              addTiles() %>%
-              setView(lng = 118, lat = -2, zoom = 5) %>%
-              addCircleMarkers(
-                lng = ~lon, lat = ~lat,
-                fillColor = ~pal(value),
-                color = "white",
-                weight = 2,
-                radius = 8,
-                fillOpacity = 0.8,
-                popup = ~paste(
-                  "<strong>", input$map_variable, ":</strong>", round(value, 3)
-                )
-              ) %>%
-              addLegend(
-                pal = pal,
-                values = ~value,
-                title = input$map_variable,
-                position = "bottomright"
-              )
-            
-            return(m)
-          }
-          
-        }, error = function(e) {
-          # If GeoJSON processing fails, fallback to points
-          map_data <- values$processed_data
-          if (!"lat" %in% names(map_data)) {
-            set.seed(123)
-            map_data$lat <- runif(nrow(map_data), -11, 6)
-            map_data$lon <- runif(nrow(map_data), 95, 141)
-          }
-          map_data$value <- var_data
-          
-          pal <- colorNumeric(palette = input$color_palette, domain = map_data$value)
-          
-          m <- leaflet(map_data) %>%
-            addTiles() %>%
-            setView(lng = 118, lat = -2, zoom = 5) %>%
-            addCircleMarkers(
-              lng = ~lon, lat = ~lat,
-              fillColor = ~pal(value),
-              color = "white",
-              weight = 2,
-              radius = 8,
-              fillOpacity = 0.8,
-              popup = ~paste(
-                "<strong>", input$map_variable, ":</strong>", round(value, 3)
-              )
-            ) %>%
-            addLegend(
-              pal = pal,
-              values = ~value,
-              title = input$map_variable,
-              position = "bottomright"
-            )
-          
-          return(m)
-        })
-      } else {
-        # Use synthetic point data
-        if (is.null(values$map_data)) {
-          # Generate synthetic coordinates
-          n_obs <- length(var_data)
-          set.seed(123)
-          
-          map_data <- data.frame(
-            lat = runif(n_obs, -11, 6),
-            lon = runif(n_obs, 95, 141),
-            value = var_data,
-            district_id = paste0("District_", 1:n_obs),
-            stringsAsFactors = FALSE
-          )
-          values$map_data <- map_data
-        } else {
-          # Update existing map data with new variable
-          values$map_data$value <- var_data
-        }
-        
-        map_data <- values$map_data
-        
-        # Create color palette
-        pal <- colorNumeric(palette = input$color_palette, domain = map_data$value)
-        
-        # Create leaflet map
-        m <- leaflet(map_data) %>%
-          addTiles() %>%
-          setView(lng = 118, lat = -2, zoom = 5)
-        
-        if (input$map_type == "point") {
-          m <- m %>%
-            addCircleMarkers(
-              lng = ~lon, lat = ~lat,
-              color = ~pal(value),
-              radius = 6,
-              fillOpacity = 0.8,
-              stroke = TRUE,
-              weight = 1,
-              popup = ~paste("District:", district_id, "<br>",
-                             input$map_variable, ":", round(value, 3))
-            )
-        } else if (input$map_type == "heat") {
-          # Heat map style with varying sizes
-          m <- m %>%
-            addCircleMarkers(
-              lng = ~lon, lat = ~lat,
-              color = ~pal(value),
-              radius = ~scales::rescale(value, to = c(3, 15)),
-              fillOpacity = 0.6,
-              stroke = TRUE,
-              weight = 1,
-              popup = ~paste("District:", district_id, "<br>",
-                             input$map_variable, ":", round(value, 3))
-            )
-        } else { # choropleth style with points
-          m <- m %>%
-            addCircleMarkers(
-              lng = ~lon, lat = ~lat,
-              fillColor = ~pal(value),
-              color = "white",
-              weight = 2,
-              radius = 8,
-              fillOpacity = 0.8,
-              popup = ~paste("District:", district_id, "<br>",
-                             input$map_variable, ":", round(value, 3))
-            )
-        }
-        
-        # Add legend
+      # Create leaflet map
+      m <- leaflet(map_data) %>%
+        addTiles() %>%
+        setView(lng = mean(map_data$lon, na.rm = TRUE), lat = mean(map_data$lat, na.rm = TRUE), zoom = 5)
+      
+      if (input$map_type == "point") {
         m <- m %>%
-          addLegend(
-            pal = pal,
-            values = ~value,
-            title = input$map_variable,
-            position = "bottomright"
+          addCircleMarkers(
+            lng = ~lon, lat = ~lat,
+            color = ~pal(value),
+            radius = 6,
+            fillOpacity = 0.8,
+            stroke = TRUE,
+            weight = 1,
+            popup = ~paste("District:", district_id, "<br>",
+                           input$map_variable, ":", round(value, 3))
           )
-        
-        return(m)
+      } else if (input$map_type == "heat") {
+        # Heat map style with varying sizes
+        m <- m %>%
+          addCircleMarkers(
+            lng = ~lon, lat = ~lat,
+            color = ~pal(value),
+            radius = ~scales::rescale(value, to = c(3, 15)),
+            fillOpacity = 0.6,
+            stroke = TRUE,
+            weight = 1,
+            popup = ~paste("District:", district_id, "<br>",
+                           input$map_variable, ":", round(value, 3))
+          )
+      } else { # choropleth
+        m <- m %>%
+          addCircleMarkers(
+            lng = ~lon, lat = ~lat,
+            fillColor = ~pal(value),
+            color = "white",
+            weight = 2,
+            radius = 8,
+            fillOpacity = 0.8,
+            popup = ~paste("District:", district_id, "<br>",
+                           input$map_variable, ":", round(value, 3))
+          )
       }
+      
+      # Add legend
+      m <- m %>%
+        addLegend(
+          pal = pal,
+          values = ~value,
+          title = input$map_variable,
+          position = "bottomright"
+        )
+      
+      return(m)
     }
   })
   
   output$spatial_stats <- renderPrint({
-    if (values$map_generated && !is.null(input$map_variable)) {
-      var_data <- values$processed_data[[input$map_variable]]
+    if (values$map_generated && !is.null(values$map_data)) {
+      map_data <- values$map_data
       
       cat("STATISTIK DISTRIBUSI SPASIAL\n")
       cat("=============================\n")
       cat("Variabel:", input$map_variable, "\n")
-      cat("Tipe peta:", input$map_type, "\n")
-      cat("Jumlah lokasi:", length(var_data), "\n")
-      cat("Sumber geografis:", if(is.null(values$indonesia_sf)) "Synthetic coordinates" else "Indonesia GeoJSON", "\n")
-      
+      cat("Jumlah lokasi:", nrow(map_data), "\n")
+      cat("Range koordinat:\n")
+      cat("- Latitude:", round(min(map_data$lat), 3), "to", round(max(map_data$lat), 3), "\n")
+      cat("- Longitude:", round(min(map_data$lon), 3), "to", round(max(map_data$lon), 3), "\n")
       cat("\nDistribusi nilai:\n")
-      cat("- Min:", round(min(var_data, na.rm = TRUE), 3), "\n")
-      cat("- Max:", round(max(var_data, na.rm = TRUE), 3), "\n")
-      cat("- Mean:", round(mean(var_data, na.rm = TRUE), 3), "\n")
-      cat("- SD:", round(sd(var_data, na.rm = TRUE), 3), "\n")
+      cat("- Min:", round(min(map_data$value, na.rm = TRUE), 3), "\n")
+      cat("- Max:", round(max(map_data$value, na.rm = TRUE), 3), "\n")
+      cat("- Mean:", round(mean(map_data$value, na.rm = TRUE), 3), "\n")
+      cat("- SD:", round(sd(map_data$value, na.rm = TRUE), 3), "\n")
       
       # Calculate spatial statistics
-      value_data <- var_data[!is.na(var_data)]
+      value_data <- map_data$value[!is.na(map_data$value)]
       q1 <- quantile(value_data, 0.25)
       q3 <- quantile(value_data, 0.75)
       high_values <- sum(value_data > q3)
@@ -1294,22 +983,16 @@ server <- function(input, output, session) {
   })
   
   output$spatial_interpretation <- renderPrint({
-    if (values$map_generated && !is.null(input$map_variable)) {
+    if (values$map_generated && !is.null(values$map_data)) {
       cat("INTERPRETASI POLA SPASIAL\n")
       cat("=========================\n")
       cat("Peta menunjukkan distribusi geografis dari", input$map_variable, "\n\n")
       
       cat("Pola yang dapat diamati:\n")
       cat("1. DISTRIBUSI GEOGRAFIS:\n")
-      if (!is.null(values$indonesia_sf)) {
-        cat("   - Peta choropleth Indonesia menampilkan pola regional\n")
-        cat("   - Warna polygon menunjukkan intensitas per kabupaten/kota\n")
-        cat("   - Dapat mengidentifikasi clustering provinsi/regional\n")
-      } else {
-        cat("   - Peta menampilkan sebaran titik across Indonesia\n")
-        cat("   - Warna menunjukkan intensitas/magnitude variabel\n")
-        cat("   - Variasi spasial menunjukkan heterogenitas geografis\n")
-      }
+      cat("   - Peta menampilkan sebaran nilai across Indonesia\n")
+      cat("   - Warna menunjukkan intensitas/magnitude variabel\n")
+      cat("   - Variasi spasial menunjukkan heterogenitas geografis\n")
       
       cat("\n2. KLASTERISASI:\n")
       cat("   - Perhatikan apakah ada pengelompokan nilai tinggi/rendah\n")
@@ -1329,7 +1012,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # UJI NORMALITAS - ENHANCED WITH TRACKING
+  # UJI NORMALITAS
   # =============================================================================
   
   observeEvent(input$run_normality, {
@@ -1361,28 +1044,6 @@ server <- function(input, output, session) {
       
       values$normality_result <- test_result
       values$normality_done <- TRUE
-      
-      # Add to activity tracker
-      test_interpretation <- if(test_result$p.value > 0.05) {
-        "Data berdistribusi normal (gagal menolak H0)"
-      } else {
-        "Data tidak berdistribusi normal (tolak H0)"
-      }
-      
-      add_activity_to_tracker(
-        type = "test",
-        title = paste("Uji Normalitas -", input$normality_test, "pada", input$normality_variable),
-        content = paste(
-          paste("Variabel:", input$normality_variable),
-          paste("Metode uji:", input$normality_test),
-          paste("Ukuran sampel:", length(var_data)),
-          paste("Statistik uji:", round(test_result$statistic, 4)),
-          paste("P-value:", format_pvalue(test_result$p.value)),
-          paste("Interpretasi:", test_interpretation),
-          sep = "\n"
-        ),
-        tables = paste(capture.output(print(test_result)), collapse = "\n")
-      )
       
       safe_notification("Uji normalitas selesai", "success")
       
@@ -1432,7 +1093,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # UJI HOMOGENITAS - ENHANCED WITH TRACKING
+  # UJI HOMOGENITAS
   # =============================================================================
   
   observeEvent(input$run_homogeneity, {
@@ -1455,28 +1116,6 @@ server <- function(input, output, session) {
       
       values$homogeneity_result <- test_result
       values$homogeneity_done <- TRUE
-      
-      # Add to activity tracker
-      p_value <- if(input$homogeneity_test == "levene") test_result$`Pr(>F)`[1] else test_result$p.value
-      test_interpretation <- if(p_value > 0.05) {
-        "Varians antar grup homogen (gagal menolak H0)"
-      } else {
-        "Varians antar grup tidak homogen (tolak H0)"
-      }
-      
-      add_activity_to_tracker(
-        type = "test",
-        title = paste("Uji Homogenitas -", input$homogeneity_test),
-        content = paste(
-          paste("Variabel numerik:", input$homogeneity_numeric),
-          paste("Variabel grup:", input$homogeneity_group),
-          paste("Metode uji:", input$homogeneity_test),
-          paste("P-value:", format_pvalue(p_value)),
-          paste("Interpretasi:", test_interpretation),
-          sep = "\n"
-        ),
-        tables = paste(capture.output(print(test_result)), collapse = "\n")
-      )
       
       safe_notification("Uji homogenitas selesai", "success")
       
@@ -1596,7 +1235,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # UJI BEDA RATA-RATA (t-test) - ENHANCED WITH TRACKING
+  # UJI BEDA RATA-RATA (t-test)
   # =============================================================================
   
   observeEvent(input$run_ttest, {
@@ -1631,31 +1270,6 @@ server <- function(input, output, session) {
       
       values$ttest_result <- test_result
       values$ttest_done <- TRUE
-      
-      # Add to activity tracker
-      test_interpretation <- if(test_result$p.value <= 0.05) {
-        "Terdapat perbedaan yang signifikan (tolak H0)"
-      } else {
-        "Tidak ada perbedaan yang signifikan (gagal menolak H0)"
-      }
-      
-      add_activity_to_tracker(
-        type = "test",
-        title = paste("Uji t -", input$ttest_type),
-        content = paste(
-          paste("Jenis uji:", input$ttest_type),
-          paste("Variabel:", input$ttest_variable),
-          if(input$ttest_type == "one_sample") paste("Nilai uji:", input$test_value) else "",
-          if(input$ttest_type == "independent") paste("Variabel grup:", input$ttest_group) else "",
-          if(input$ttest_type == "paired") paste("Variabel kedua:", input$ttest_paired_var) else "",
-          paste("T-statistic:", round(test_result$statistic, 4)),
-          paste("P-value:", format_pvalue(test_result$p.value)),
-          paste("Confidence level:", input$confidence_level * 100, "%"),
-          paste("Interpretasi:", test_interpretation),
-          sep = "\n"
-        ),
-        tables = paste(capture.output(print(test_result)), collapse = "\n")
-      )
       
       safe_notification("Uji t berhasil dilakukan", "success")
       
@@ -1873,7 +1487,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # UJI PROPORSI & VARIANCE - ENHANCED WITH TRACKING
+  # UJI PROPORSI & VARIANCE
   # =============================================================================
   
   observeEvent(input$run_prop_test, {
@@ -1916,29 +1530,6 @@ server <- function(input, output, session) {
       
       values$prop_test_result <- test_result
       values$prop_test_done <- TRUE
-      
-      # Add to activity tracker
-      test_interpretation <- if(test_result$p.value <= 0.05) {
-        "Terdapat perbedaan proporsi yang signifikan"
-      } else {
-        "Tidak ada perbedaan proporsi yang signifikan"
-      }
-      
-      add_activity_to_tracker(
-        type = "test",
-        title = paste("Uji Proporsi -", input$prop_test_type),
-        content = paste(
-          paste("Jenis uji:", input$prop_test_type),
-          paste("Variabel:", input$prop_variable),
-          if(input$prop_test_type == "one_prop") paste("Proporsi uji:", input$prop_test_value) else "",
-          if(input$prop_test_type == "two_prop") paste("Variabel grup:", input$prop_group) else "",
-          paste("Chi-squared:", round(test_result$statistic, 4)),
-          paste("P-value:", format_pvalue(test_result$p.value)),
-          paste("Interpretasi:", test_interpretation),
-          sep = "\n"
-        ),
-        tables = paste(capture.output(print(test_result)), collapse = "\n")
-      )
       
       safe_notification("Uji proporsi berhasil dilakukan", "success")
       
@@ -2069,29 +1660,6 @@ server <- function(input, output, session) {
       values$var_test_result <- test_result
       values$var_test_done <- TRUE
       
-      # Add to activity tracker
-      test_interpretation <- if(test_result$p.value <= 0.05) {
-        "Terdapat perbedaan variance yang signifikan"
-      } else {
-        "Tidak ada perbedaan variance yang signifikan"
-      }
-      
-      add_activity_to_tracker(
-        type = "test",
-        title = paste("Uji Variance -", input$var_test_type),
-        content = paste(
-          paste("Jenis uji:", input$var_test_type),
-          paste("Variabel:", input$var_variable),
-          if(input$var_test_type == "one_var") paste("Variance uji:", input$var_test_value) else "",
-          if(input$var_test_type == "two_var") paste("Variabel grup:", input$var_group) else "",
-          paste("Test statistic:", round(test_result$statistic, 4)),
-          paste("P-value:", format_pvalue(test_result$p.value)),
-          paste("Interpretasi:", test_interpretation),
-          sep = "\n"
-        ),
-        tables = paste(capture.output(print(test_result)), collapse = "\n")
-      )
-      
       safe_notification("Uji variance berhasil dilakukan", "success")
       
     }, error = function(e) {
@@ -2195,7 +1763,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # ANOVA - ENHANCED WITH TRACKING
+  # ANOVA
   # =============================================================================
   
   observeEvent(input$run_anova, {
@@ -2263,55 +1831,6 @@ server <- function(input, output, session) {
       }
       
       values$anova_done <- TRUE
-      
-      # Add to activity tracker
-      anova_table <- values$anova_result$summary[[1]]
-      
-      if (values$anova_result$type == "one_way") {
-        f_stat <- anova_table$`F value`[1]
-        p_value <- anova_table$`Pr(>F)`[1]
-        eta_sq <- values$anova_result$eta_squared
-        
-        test_interpretation <- if(p_value <= input$anova_alpha) {
-          "Terdapat perbedaan rata-rata yang signifikan antar grup"
-        } else {
-          "Tidak ada perbedaan rata-rata yang signifikan antar grup"
-        }
-        
-        add_activity_to_tracker(
-          type = "test",
-          title = paste("One-Way ANOVA -", input$anova_dependent, "by", input$anova_factor1),
-          content = paste(
-            paste("Jenis ANOVA:", input$anova_type),
-            paste("Variabel dependen:", input$anova_dependent),
-            paste("Faktor:", input$anova_factor1),
-            paste("F-statistic:", round(f_stat, 4)),
-            paste("P-value:", format_pvalue(p_value)),
-            paste("Eta squared:", round(eta_sq, 4)),
-            paste("Effect size:", interpret_effect_size(eta_sq)),
-            paste("Alpha level:", input$anova_alpha),
-            paste("Interpretasi:", test_interpretation),
-            sep = "\n"
-          ),
-          tables = paste(capture.output(print(anova_table)), collapse = "\n")
-        )
-      } else {
-        add_activity_to_tracker(
-          type = "test",
-          title = paste("Two-Way ANOVA -", input$anova_dependent),
-          content = paste(
-            paste("Jenis ANOVA:", input$anova_type),
-            paste("Variabel dependen:", input$anova_dependent),
-            paste("Faktor 1:", input$anova_factor1),
-            paste("Faktor 2:", input$anova_factor2),
-            paste("Interaksi:", if(input$include_interaction) "Ya" else "Tidak"),
-            paste("Alpha level:", input$anova_alpha),
-            "Hasil per faktor tercantum dalam tabel ANOVA",
-            sep = "\n"
-          ),
-          tables = paste(capture.output(print(anova_table)), collapse = "\n")
-        )
-      }
       
       safe_notification("ANOVA berhasil dilakukan", "success")
       
@@ -2548,7 +2067,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # REGRESI LINEAR BERGANDA - ENHANCED WITH TRACKING
+  # REGRESI LINEAR BERGANDA
   # =============================================================================
   
   observeEvent(input$run_regression, {
@@ -2571,36 +2090,6 @@ server <- function(input, output, session) {
       lm_model <- lm(formula, data = values$processed_data)
       values$regression_model <- lm_model
       values$regression_done <- TRUE
-      
-      # Add to activity tracker
-      model_summary <- summary(lm_model)
-      r_sq <- model_summary$r.squared
-      f_p_value <- pf(model_summary$fstatistic[1], 
-                      model_summary$fstatistic[2], 
-                      model_summary$fstatistic[3], 
-                      lower.tail = FALSE)
-      
-      # Significant predictors
-      coeffs <- model_summary$coefficients
-      sig_vars <- rownames(coeffs)[coeffs[, 4] <= 0.05 & rownames(coeffs) != "(Intercept)"]
-      
-      add_activity_to_tracker(
-        type = "test",
-        title = paste("Regresi Linear -", input$reg_dependent),
-        content = paste(
-          paste("Variabel dependen:", input$reg_dependent),
-          paste("Variabel independen:", paste(input$reg_independent, collapse = ", ")),
-          paste("Intercept:", if(input$include_intercept) "Included" else "Excluded"),
-          paste("R-squared:", round(r_sq, 4)),
-          paste("Adjusted R-squared:", round(model_summary$adj.r.squared, 4)),
-          paste("F-statistic:", round(model_summary$fstatistic[1], 4)),
-          paste("P-value (F-test):", format_pvalue(f_p_value)),
-          paste("Variabel signifikan:", if(length(sig_vars) > 0) paste(sig_vars, collapse = ", ") else "Tidak ada"),
-          paste("Kekuatan prediksi:", if(r_sq >= 0.7) "Sangat baik" else if(r_sq >= 0.5) "Baik" else if(r_sq >= 0.3) "Moderat" else "Lemah"),
-          sep = "\n"
-        ),
-        tables = paste(capture.output(print(model_summary)), collapse = "\n")
-      )
       
       safe_notification("Regresi berhasil dilakukan", "success")
       
@@ -2929,7 +2418,7 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # ANALISIS SPASIAL LANJUTAN - ENHANCED WITH TRACKING
+  # ANALISIS SPASIAL LANJUTAN
   # =============================================================================
   
   observeEvent(input$run_spatial_analysis, {
@@ -2985,43 +2474,6 @@ server <- function(input, output, session) {
       )
       
       values$spatial_done <- TRUE
-      
-      # Add to activity tracker
-      spatial_interpretation <- if(p_value < 0.05) {
-        if(morans_i > expected_i) {
-          "Autokorelasi spasial positif signifikan (clustering)"
-        } else {
-          "Autokorelasi spasial negatif signifikan (dispersi)"
-        }
-      } else {
-        "Tidak ada autokorelasi spasial signifikan (pola acak)"
-      }
-      
-      add_activity_to_tracker(
-        type = "spatial",
-        title = paste("Analisis Autokorelasi Spasial -", input$spatial_variable),
-        content = paste(
-          paste("Variabel:", input$spatial_variable),
-          paste("Metode weight:", input$weight_type),
-          if(input$weight_type == "knn") paste("K neighbors:", input$k_neighbors) else "",
-          paste("Moran's I:", round(morans_i, 4)),
-          paste("Expected I:", round(expected_i, 4)),
-          paste("Z-score:", round(z_score, 4)),
-          paste("P-value:", format_pvalue(p_value)),
-          paste("Ukuran sampel:", n),
-          paste("Interpretasi:", spatial_interpretation),
-          sep = "\n"
-        ),
-        tables = paste(
-          "Statistik Moran's I:",
-          paste("Moran's I =", round(morans_i, 4)),
-          paste("Expected I =", round(expected_i, 4)),
-          paste("Variance =", round(variance_i, 6)),
-          paste("Z-score =", round(z_score, 4)),
-          paste("P-value =", format_pvalue(p_value)),
-          sep = "\n"
-        )
-      )
       
       safe_notification("Analisis spasial berhasil dilakukan", "success")
       
@@ -3199,24 +2651,821 @@ server <- function(input, output, session) {
   })
   
   # =============================================================================
-  # COMPREHENSIVE ACTIVITY REPORT DOWNLOAD HANDLERS - ENHANCED
+  # COMPREHENSIVE REPORT GENERATOR FUNCTION
   # =============================================================================
   
-  # Generate Activity Report PDF
-  output$generate_activity_report_pdf <- downloadHandler(
+  generate_comprehensive_rmd_report <- function() {
+    report_content <- c(
+      "---",
+      "title: 'LAPORAN ANALISIS STATISTIK KOMPREHENSIF'",
+      "subtitle: 'Dashboard WASKITA - Wawasan Spasial Kerentanan Interaktif & Terpadu Analitik'",
+      paste0("author: 'Generated by WASKITA Dashboard - ", Sys.Date(), "'"),
+      paste0("date: '", format(Sys.Date(), "%d %B %Y"), "'"),
+      "output:",
+      "  pdf_document:",
+      "    toc: true",
+      "    toc_depth: 3",
+      "    number_sections: true",
+      "    latex_engine: xelatex",
+      "  word_document:",
+      "    toc: true",
+      "    toc_depth: 3",
+      "header-includes:",
+      "  - \\usepackage[indonesian]{babel}",
+      "  - \\usepackage{booktabs}",
+      "  - \\usepackage{longtable}",
+      "  - \\usepackage{array}",
+      "  - \\usepackage{multirow}",
+      "  - \\usepackage{wrapfig}",
+      "  - \\usepackage{float}",
+      "  - \\usepackage{colortbl}",
+      "  - \\usepackage{pdflscape}",
+      "  - \\usepackage{tabu}",
+      "  - \\usepackage{threeparttable}",
+      "  - \\usepackage{threeparttablex}",
+      "  - \\usepackage[normalem]{ulem}",
+      "  - \\usepackage{makecell}",
+      "  - \\usepackage{xcolor}",
+      "---",
+      "",
+      "\\newpage",
+      "",
+      "# RINGKASAN EKSEKUTIF",
+      "",
+      "Laporan ini menyajikan hasil analisis statistik komprehensif dari dataset **Social Vulnerability Index (SoVI)** menggunakan platform WASKITA Dashboard. Analisis dilakukan untuk memahami pola kerentanan sosial di Indonesia dengan menggunakan berbagai metode statistik modern.",
+      ""
+    )
+    
+    # Dataset Overview
+    if (values$data_loaded) {
+      data_info <- values$processed_data
+      report_content <- c(report_content,
+                          "## Informasi Dataset",
+                          "",
+                          paste("- **Total Observasi:** ", nrow(data_info)),
+                          paste("- **Total Variabel:** ", ncol(data_info)),
+                          paste("- **Missing Values:** ", sum(is.na(data_info))),
+                          paste("- **Variabel Numerik:** ", sum(sapply(data_info, is.numeric))),
+                          paste("- **Variabel Kategorikal:** ", sum(sapply(data_info, function(x) is.character(x) | is.factor(x)))),
+                          ""
+      )
+    }
+    
+    # Analysis Status
+    report_content <- c(report_content,
+                        "## Status Analisis yang Dilakukan",
+                        "",
+                        "Berikut adalah ringkasan analisis yang telah berhasil dilakukan:",
+                        ""
+    )
+    
+    analysis_status <- data.frame(
+      Analisis = c("Manajemen Data", "Analisis Deskriptif", "Visualisasi Multivariat", 
+                   "Peta Distribusi Spasial", "Uji Asumsi", "Uji Beda Rata-rata",
+                   "Uji Proporsi & Variance", "ANOVA", "Regresi Linear", "Analisis Spasial"),
+      Status = c(
+        if(values$data_loaded) "✓ Completed" else "○ Pending",
+        if(values$desc_generated) "✓ Completed" else "○ Pending",
+        if(values$viz_generated) "✓ Completed" else "○ Pending",
+        if(values$map_generated) "✓ Completed" else "○ Pending",
+        if(values$normality_done || values$homogeneity_done) "✓ Completed" else "○ Pending",
+        if(values$ttest_done) "✓ Completed" else "○ Pending",
+        if(values$prop_test_done || values$var_test_done) "✓ Completed" else "○ Pending",
+        if(values$anova_done) "✓ Completed" else "○ Pending",
+        if(values$regression_done) "✓ Completed" else "○ Pending",
+        if(values$spatial_done) "✓ Completed" else "○ Pending"
+      )
+    )
+    
+    # Add status table
+    report_content <- c(report_content,
+                        "| Jenis Analisis | Status |",
+                        "|---|---|")
+    
+    for (i in 1:nrow(analysis_status)) {
+      report_content <- c(report_content,
+                          paste("|", analysis_status$Analisis[i], "|", analysis_status$Status[i], "|"))
+    }
+    
+    report_content <- c(report_content, "", "\\newpage", "")
+    
+    # Main Content Sections
+    report_content <- c(report_content,
+                        "# METADATA DATASET",
+                        "",
+                        "Dataset yang digunakan dalam analisis ini adalah **Social Vulnerability Index (SoVI)** yang merupakan indeks kerentanan sosial untuk wilayah Indonesia.",
+                        "",
+                        "## Sumber Data",
+                        "",
+                        "- **Journal:** Data in Brief",
+                        "- **Publisher:** Elsevier",  
+                        "- **DOI:** 10.1016/j.dib.2021.107618",
+                        "- **Link:** https://www.sciencedirect.com/science/article/pii/S2352340921010180",
+                        "",
+                        "## Deskripsi Variabel",
+                        ""
+    )
+    
+    # Add metadata table
+    for (i in 1:nrow(sovi_metadata)) {
+      report_content <- c(report_content,
+                          paste("**", sovi_metadata$Variabel[i], "**"),
+                          paste("- Keterangan:", sovi_metadata$Keterangan[i]),
+                          paste("- Tipe Data:", sovi_metadata$Tipe_Data[i]),
+                          ""
+      )
+    }
+    
+    report_content <- c(report_content, "\\newpage", "")
+    
+    # Descriptive Analysis Results
+    if (values$desc_generated && !is.null(values$current_desc_variable)) {
+      report_content <- c(report_content,
+                          "# HASIL ANALISIS DESKRIPTIF",
+                          "",
+                          paste("## Analisis Variabel:", values$current_desc_variable),
+                          ""
+      )
+      
+      var_data <- values$processed_data[[values$current_desc_variable]]
+      if (is.numeric(var_data)) {
+        report_content <- c(report_content,
+                            "### Statistik Deskriptif",
+                            "",
+                            paste("- **N (Valid):** ", sum(!is.na(var_data))),
+                            paste("- **Missing:** ", sum(is.na(var_data))),  
+                            paste("- **Mean:** ", round(mean(var_data, na.rm = TRUE), 4)),
+                            paste("- **Median:** ", round(median(var_data, na.rm = TRUE), 4)),
+                            paste("- **Standard Deviation:** ", round(sd(var_data, na.rm = TRUE), 4)),
+                            paste("- **Minimum:** ", round(min(var_data, na.rm = TRUE), 4)),
+                            paste("- **Maximum:** ", round(max(var_data, na.rm = TRUE), 4)),
+                            paste("- **Q1:** ", round(quantile(var_data, 0.25, na.rm = TRUE), 4)),
+                            paste("- **Q3:** ", round(quantile(var_data, 0.75, na.rm = TRUE), 4)),
+                            paste("- **IQR:** ", round(IQR(var_data, na.rm = TRUE), 4)),
+                            ""
+        )
+        
+        # Add interpretation
+        mean_val <- mean(var_data, na.rm = TRUE)
+        median_val <- median(var_data, na.rm = TRUE)
+        sd_val <- sd(var_data, na.rm = TRUE)
+        cv <- sd_val / abs(mean_val) * 100
+        
+        report_content <- c(report_content,
+                            "### Interpretasi Statistik",
+                            "",
+                            "#### Tendensi Sentral",
+                            ""
+        )
+        
+        if (abs(mean_val - median_val) / sd_val < 0.1) {
+          report_content <- c(report_content, "- Distribusi relatif **simetris** (mean ≈ median)")
+        } else if (mean_val > median_val) {
+          report_content <- c(report_content, "- Distribusi **condong kanan** (mean > median)")
+        } else {
+          report_content <- c(report_content, "- Distribusi **condong kiri** (mean < median)")
+        }
+        
+        report_content <- c(report_content,
+                            "",
+                            "#### Variabilitas", 
+                            "",
+                            paste("- **Coefficient of Variation:** ", round(cv, 2), "%")
+        )
+        
+        if (cv < 15) {
+          report_content <- c(report_content, "- Variabilitas **rendah** (data homogen)")
+        } else if (cv < 30) {
+          report_content <- c(report_content, "- Variabilitas **sedang**")
+        } else {
+          report_content <- c(report_content, "- Variabilitas **tinggi** (data heterogen)")
+        }
+      }
+    }
+    
+    # Visualization Results
+    if (values$viz_generated && !is.null(values$current_viz_type)) {
+      report_content <- c(report_content,
+                          "",
+                          "\\newpage",
+                          "",
+                          "# HASIL VISUALISASI MULTIVARIAT",
+                          "",
+                          paste("## Jenis Visualisasi:", switch(values$current_viz_type,
+                                                                "scatter" = "Scatter Plot",
+                                                                "correlation" = "Correlation Heatmap",
+                                                                "boxplot_group" = "Box Plot by Group", 
+                                                                "histogram_overlay" = "Histogram Overlay")),
+                          ""
+      )
+      
+      # Add visualization interpretation
+      if (values$current_viz_type == "scatter" && !is.null(input$scatter_x) && !is.null(input$scatter_y)) {
+        x_data <- values$processed_data[[input$scatter_x]]
+        y_data <- values$processed_data[[input$scatter_y]]
+        cor_val <- cor(x_data, y_data, use = "complete.obs")
+        
+        report_content <- c(report_content,
+                            paste("### Analisis Korelasi: ", input$scatter_x, "vs", input$scatter_y),
+                            "",
+                            paste("- **Koefisien Korelasi:** ", round(cor_val, 4)),
+                            paste("- **Kekuatan Hubungan:** ", interpret_correlation(cor_val)),
+                            paste("- **Arah Hubungan:** ", if(cor_val > 0) "Positif" else "Negatif"),
+                            ""
+        )
+        
+        if (abs(cor_val) > 0.7) {
+          report_content <- c(report_content, "**Kesimpulan:** Hubungan yang **kuat** ditemukan antara kedua variabel.")
+        } else if (abs(cor_val) > 0.3) {
+          report_content <- c(report_content, "**Kesimpulan:** Hubungan yang **sedang** ditemukan antara kedua variabel.")
+        } else {
+          report_content <- c(report_content, "**Kesimpulan:** Hubungan yang **lemah** ditemukan antara kedua variabel.")
+        }
+      }
+    }
+    
+    # Spatial Map Results
+    if (values$map_generated && !is.null(values$map_data)) {
+      report_content <- c(report_content,
+                          "",
+                          "\\newpage",
+                          "", 
+                          "# HASIL PETA DISTRIBUSI SPASIAL",
+                          "",
+                          paste("## Peta Variabel:", input$map_variable),
+                          "",
+                          "### Statistik Distribusi Spasial",
+                          ""
+      )
+      
+      map_data <- values$map_data
+      report_content <- c(report_content,
+                          paste("- **Jumlah Lokasi:** ", nrow(map_data)),
+                          paste("- **Range Latitude:** ", round(min(map_data$lat), 3), "hingga", round(max(map_data$lat), 3)),
+                          paste("- **Range Longitude:** ", round(min(map_data$lon), 3), "hingga", round(max(map_data$lon), 3)),
+                          paste("- **Nilai Minimum:** ", round(min(map_data$value, na.rm = TRUE), 3)),
+                          paste("- **Nilai Maksimum:** ", round(max(map_data$value, na.rm = TRUE), 3)),
+                          paste("- **Nilai Rata-rata:** ", round(mean(map_data$value, na.rm = TRUE), 3)),
+                          paste("- **Standard Deviasi:** ", round(sd(map_data$value, na.rm = TRUE), 3)),
+                          "",
+                          "### Interpretasi Pola Spasial",
+                          "",
+                          paste("Peta distribusi spasial menunjukkan sebaran geografis variabel **", input$map_variable, "** di seluruh Indonesia. Analisis pola spasial mengindikasikan:"),
+                          "",
+                          "1. **Distribusi Geografis:** Variasi nilai menunjukkan heterogenitas geografis",
+                          "2. **Klasterisasi:** Area dengan nilai serupa mengindikasikan pola lokal",
+                          "3. **Outlier Spasial:** Lokasi dengan nilai berbeda dari sekitarnya perlu investigasi lebih lanjut",
+                          "4. **Implikasi Kebijakan:** Identifikasi area prioritas berdasarkan pola spasial",
+                          ""
+      )
+    }
+    
+    # Assumption Tests Results
+    if (values$normality_done || values$homogeneity_done) {
+      report_content <- c(report_content,
+                          "",
+                          "\\newpage",
+                          "",
+                          "# HASIL UJI ASUMSI DATA",
+                          ""
+      )
+      
+      if (values$normality_done && !is.null(values$normality_result)) {
+        report_content <- c(report_content,
+                            "## Uji Normalitas",
+                            "",
+                            paste("**Variabel:** ", input$normality_variable),
+                            paste("**Metode:** ", switch(input$normality_test,
+                                                         "shapiro" = "Shapiro-Wilk Test",
+                                                         "ks" = "Kolmogorov-Smirnov Test", 
+                                                         "ad" =  "Anderson-Darling Test")),
+                            "",
+                            "### Hipotesis",
+                            "",
+                            "- **H₀:** Data berdistribusi normal",
+                            "- **H₁:** Data tidak berdistribusi normal", 
+                            "- **α:** 0.05",
+                            "",
+                            "### Hasil",
+                            "",
+                            paste("- **Statistik Uji:** ", round(values$normality_result$statistic, 4)),
+                            paste("- **P-value:** ", format_pvalue(values$normality_result$p.value)),
+                            ""
+        )
+        
+        p_value <- values$normality_result$p.value
+        if (p_value > 0.05) {
+          report_content <- c(report_content,
+                              "### Kesimpulan",
+                              "",
+                              "- **Keputusan:** Gagal menolak H₀",
+                              "- **Interpretasi:** Data dapat dianggap berdistribusi normal (α = 0.05)",
+                              "- **Implikasi:** Dapat menggunakan uji parametrik",
+                              ""
+          )
+        } else {
+          report_content <- c(report_content,
+                              "### Kesimpulan", 
+                              "",
+                              "- **Keputusan:** Tolak H₀",
+                              "- **Interpretasi:** Data tidak berdistribusi normal (α = 0.05)",
+                              "- **Implikasi:** Pertimbangkan transformasi atau uji non-parametrik",
+                              ""
+          )
+        }
+      }
+      
+      if (values$homogeneity_done && !is.null(values$homogeneity_result)) {
+        report_content <- c(report_content,
+                            "## Uji Homogenitas Varians",
+                            "",
+                            paste("**Variabel Numerik:** ", input$homogeneity_numeric),
+                            paste("**Variabel Grup:** ", input$homogeneity_group),
+                            paste("**Metode:** ", switch(input$homogeneity_test,
+                                                         "levene" = "Levene's Test",
+                                                         "bartlett" = "Bartlett's Test",
+                                                         "fligner" = "Fligner-Killeen Test")),
+                            "",
+                            "### Hipotesis",
+                            "",
+                            "- **H₀:** Varians antar grup homogen",
+                            "- **H₁:** Varians antar grup tidak homogen",
+                            "- **α:** 0.05",
+                            ""
+        )
+        
+        p_value <- if(input$homogeneity_test == "levene") values$homogeneity_result$`Pr(>F)`[1] else values$homogeneity_result$p.value
+        
+        report_content <- c(report_content,
+                            "### Hasil",
+                            "",
+                            paste("- **P-value:** ", format_pvalue(p_value)),
+                            ""
+        )
+        
+        if (p_value > 0.05) {
+          report_content <- c(report_content,
+                              "### Kesimpulan",
+                              "",
+                              "- **Keputusan:** Gagal menolak H₀",
+                              "- **Interpretasi:** Varians antar grup homogen (α = 0.05)",
+                              "- **Implikasi:** Asumsi homogenitas terpenuhi untuk ANOVA",
+                              ""
+          )
+        } else {
+          report_content <- c(report_content,
+                              "### Kesimpulan",
+                              "",
+                              "- **Keputusan:** Tolak H₀",
+                              "- **Interpretasi:** Varians antar grup tidak homogen (α = 0.05)",
+                              "- **Implikasi:** Gunakan Welch's test atau transformasi data",
+                              ""
+          )
+        }
+      }
+    }
+    
+    # T-test Results
+    if (values$ttest_done && !is.null(values$ttest_result)) {
+      report_content <- c(report_content,
+                          "",
+                          "\\newpage",
+                          "",
+                          "# HASIL UJI BEDA RATA-RATA (T-TEST)",
+                          "",
+                          paste("## Jenis Uji:", switch(input$ttest_type,
+                                                        "one_sample" = "One Sample t-test",
+                                                        "independent" = "Independent Samples t-test",
+                                                        "paired" = "Paired Samples t-test")),
+                          "",
+                          paste("**Variabel:** ", input$ttest_variable),
+                          paste("**Confidence Level:** ", input$confidence_level * 100, "%"),
+                          ""
+      )
+      
+      # Add hypothesis
+      if (input$ttest_type == "one_sample") {
+        report_content <- c(report_content,
+                            "### Hipotesis",
+                            "",
+                            paste("- **H₀:** μ =", input$test_value),
+                            paste("- **H₁:** μ", switch(input$alternative,
+                                                        "two.sided" = "≠",
+                                                        "greater" = ">",
+                                                        "less" = "<"), input$test_value),
+                            ""
+        )
+      } else if (input$ttest_type == "independent") {
+        report_content <- c(report_content,
+                            "### Hipotesis",
+                            "",
+                            "- **H₀:** μ₁ = μ₂",
+                            paste("- **H₁:** μ₁", switch(input$alternative,
+                                                         "two.sided" = "≠",
+                                                         "greater" = ">",
+                                                         "less" = "<"), "μ₂"),
+                            ""
+        )
+      } else {
+        report_content <- c(report_content,
+                            "### Hipotesis",
+                            "",
+                            "- **H₀:** μd = 0",
+                            paste("- **H₁:** μd", switch(input$alternative,
+                                                         "two.sided" = "≠",
+                                                         "greater" = ">",
+                                                         "less" = "<"), "0"),
+                            ""
+        )
+      }
+      
+      # Add results
+      result <- values$ttest_result
+      report_content <- c(report_content,
+                          "### Hasil",
+                          "",
+                          paste("- **t-statistic:** ", round(result$statistic, 4)),
+                          paste("- **Degrees of Freedom:** ", result$parameter),
+                          paste("- **P-value:** ", format_pvalue(result$p.value)),
+                          ""
+      )
+      
+      # Add confidence interval if available
+      if (!is.null(result$conf.int)) {
+        ci <- result$conf.int
+        report_content <- c(report_content,
+                            paste("- **Confidence Interval (", input$confidence_level * 100, "%):** [", 
+                                  round(ci[1], 4), ", ", round(ci[2], 4), "]"),
+                            ""
+        )
+      }
+      
+      # Add interpretation
+      p_value <- result$p.value
+      report_content <- c(report_content,
+                          "### Interpretasi",
+                          "",
+                          paste("- **P-value:** ", format_pvalue(p_value)),
+                          paste("- **Signifikansi:** ", interpret_significance(p_value)),
+                          ""
+      )
+      
+      if (p_value <= 0.05) {
+        report_content <- c(report_content,
+                            "### Kesimpulan",
+                            "",
+                            "- **Keputusan:** Tolak H₀",
+                            "- **Interpretasi:** Terdapat perbedaan yang signifikan secara statistik",
+                            "- **Rekomendasi:** Hasil dapat dipublikasikan sebagai temuan signifikan",
+                            ""
+        )
+      } else {
+        report_content <- c(report_content,
+                            "### Kesimpulan",
+                            "",
+                            "- **Keputusan:** Gagal menolak H₀",
+                            "- **Interpretasi:** Tidak ada perbedaan yang signifikan secara statistik",
+                            "- **Rekomendasi:** Pertimbangkan power analysis dan kemungkinan Type II error",
+                            ""
+        )
+      }
+    }
+    
+    # ANOVA Results
+    if (values$anova_done && !is.null(values$anova_result)) {
+      report_content <- c(report_content,
+                          "",
+                          "\\newpage",
+                          "",
+                          "# HASIL ANALYSIS OF VARIANCE (ANOVA)",
+                          "",
+                          paste("## Jenis ANOVA:", if(values$anova_result$type == "one_way") "One-Way ANOVA" else "Two-Way ANOVA"),
+                          "",
+                          paste("**Variabel Dependen:** ", input$anova_dependent),
+                          paste("**Faktor 1:** ", input$anova_factor1)
+      )
+      
+      if (values$anova_result$type == "two_way") {
+        report_content <- c(report_content,
+                            paste("**Faktor 2:** ", input$anova_factor2),
+                            paste("**Interaksi:** ", if(input$include_interaction) "Ya" else "Tidak")
+        )
+      }
+      
+      report_content <- c(report_content,
+                          paste("**Alpha Level:** ", input$anova_alpha),
+                          "",
+                          "### Hasil ANOVA",
+                          ""
+      )
+      
+      anova_table <- values$anova_result$summary[[1]]
+      
+      if (values$anova_result$type == "one_way") {
+        f_stat <- anova_table$`F value`[1]
+        p_value <- anova_table$`Pr(>F)`[1]
+        eta_sq <- values$anova_result$eta_squared
+        
+        report_content <- c(report_content,
+                            paste("- **F-statistic:** ", round(f_stat, 4)),
+                            paste("- **P-value:** ", format_pvalue(p_value)),
+                            paste("- **Eta Squared (η²):** ", round(eta_sq, 4)),
+                            paste("- **Effect Size:** ", interpret_effect_size(eta_sq)),
+                            ""
+        )
+        
+        if (p_value <= input$anova_alpha) {
+          report_content <- c(report_content,
+                              "### Kesimpulan",
+                              "",
+                              "- **Status:** SIGNIFIKAN",
+                              "- **Interpretasi:** Terdapat perbedaan rata-rata yang signifikan antar grup",
+                              paste("- **Proporsi Varians Dijelaskan:** ", round(eta_sq * 100, 2), "%"),
+                              "- **Rekomendasi:** Lakukan post-hoc test untuk identifikasi grup yang berbeda",
+                              ""
+          )
+        } else {
+          report_content <- c(report_content,
+                              "### Kesimpulan",
+                              "",
+                              "- **Status:** TIDAK SIGNIFIKAN",
+                              "- **Interpretasi:** Tidak ada perbedaan rata-rata yang signifikan antar grup",
+                              "- **Rekomendasi:** Pertimbangkan power analysis dan evaluasi kemungkinan Type II error",
+                              ""
+          )
+        }
+      }
+    }
+    
+    # Regression Results
+    if (values$regression_done && !is.null(values$regression_model)) {
+      model <- values$regression_model
+      model_summary <- summary(model)
+      
+      report_content <- c(report_content,
+                          "",
+                          "\\newpage",
+                          "",
+                          "# HASIL ANALISIS REGRESI LINEAR",
+                          "",
+                          paste("**Variabel Dependen:** ", input$reg_dependent),
+                          paste("**Variabel Independen:** ", paste(input$reg_independent, collapse = ", ")),
+                          paste("**Intercept:** ", if(input$include_intercept) "Included" else "Excluded"),
+                          "",
+                          "## Statistik Kesesuaian Model",
+                          "",
+                          paste("- **R-squared:** ", round(model_summary$r.squared, 4)),
+                          paste("- **Adjusted R-squared:** ", round(model_summary$adj.r.squared, 4)),
+                          paste("- **F-statistic:** ", round(model_summary$fstatistic[1], 4)),
+                          paste("- **P-value (F-test):** ", format_pvalue(pf(model_summary$fstatistic[1], 
+                                                                             model_summary$fstatistic[2], 
+                                                                             model_summary$fstatistic[3], 
+                                                                             lower.tail = FALSE))),
+                          paste("- **Residual Standard Error:** ", round(model_summary$sigma, 4)),
+                          paste("- **Degrees of Freedom:** ", model$df.residual),
+                          paste("- **Observations:** ", nobs(model)),
+                          ""
+      )
+      
+      # Model interpretation
+      r_sq <- model_summary$r.squared
+      f_p_value <- pf(model_summary$fstatistic[1], 
+                      model_summary$fstatistic[2], 
+                      model_summary$fstatistic[3], 
+                      lower.tail = FALSE)
+      
+      report_content <- c(report_content,
+                          "## Interpretasi Model",
+                          "",
+                          paste("Model menjelaskan **", round(r_sq * 100, 2), "%** variasi dalam variabel ", input$reg_dependent, "."),
+                          ""
+      )
+      
+      if (r_sq >= 0.7) {
+        report_content <- c(report_content, "**Kekuatan Prediksi:** SANGAT BAIK")
+      } else if (r_sq >= 0.5) {
+        report_content <- c(report_content, "**Kekuatan Prediksi:** BAIK")
+      } else if (r_sq >= 0.3) {
+        report_content <- c(report_content, "**Kekuatan Prediksi:** MODERAT")
+      } else {
+        report_content <- c(report_content, "**Kekuatan Prediksi:** LEMAH")
+      }
+      
+      # Significant predictors
+      coeffs <- model_summary$coefficients
+      sig_vars <- rownames(coeffs)[coeffs[, 4] <= 0.05 & rownames(coeffs) != "(Intercept)"]
+      
+      if (length(sig_vars) > 0) {
+        report_content <- c(report_content,
+                            "",
+                            "## Variabel Prediktor Signifikan",
+                            ""
+        )
+        
+        for (var in sig_vars) {
+          coeff <- coeffs[var, 1]
+          p_val <- coeffs[var, 4]
+          report_content <- c(report_content,
+                              paste("- **", var, ":** koefisien = ", round(coeff, 4), 
+                                    " (", ifelse(coeff > 0, "pengaruh positif", "pengaruh negatif"), 
+                                    ", p = ", format_pvalue(p_val), ")")
+          )
+        }
+      } else {
+        report_content <- c(report_content,
+                            "",
+                            "**Catatan:** Tidak ada variabel prediktor yang signifikan pada α = 0.05",
+                            ""
+        )
+      }
+      
+      # Model recommendations
+      report_content <- c(report_content,
+                          "",
+                          "## Rekomendasi",
+                          ""
+      )
+      
+      if (f_p_value <= 0.05 && r_sq >= 0.3) {
+        report_content <- c(report_content,
+                            "1. Model dapat digunakan untuk prediksi",
+                            "2. Periksa asumsi regresi untuk validitas",
+                            "3. Pertimbangkan validasi silang untuk evaluasi performa"
+        )
+      } else if (f_p_value <= 0.05 && r_sq < 0.3) {
+        report_content <- c(report_content,
+                            "1. Model signifikan tetapi kekuatan prediksi lemah",
+                            "2. Pertimbangkan menambah variabel prediktor",
+                            "3. Evaluasi transformasi variabel"
+        )
+      } else {
+        report_content <- c(report_content,
+                            "1. Model tidak signifikan - tidak cocok untuk prediksi",
+                            "2. Pertimbangkan model alternatif",
+                            "3. Evaluasi kembali pemilihan variabel"
+        )
+      }
+    }
+    
+    # Spatial Analysis Results
+    if (values$spatial_done && !is.null(values$spatial_result)) {
+      result <- values$spatial_result
+      
+      report_content <- c(report_content,
+                          "",
+                          "\\newpage",
+                          "",
+                          "# HASIL ANALISIS SPASIAL",
+                          "",
+                          paste("**Variabel:** ", input$spatial_variable),
+                          paste("**Metode Weight:** ", switch(input$weight_type,
+                                                              "distance_inverse" = "Inverse Distance",
+                                                              "distance_exp" = "Exponential Distance",
+                                                              "knn" = paste("K-Nearest Neighbors (k=", input$k_neighbors, ")"))),
+                          "",
+                          "## Statistik Moran's I",
+                          "",
+                          paste("- **Moran's I:** ", round(result$morans_i, 4)),
+                          paste("- **Expected I:** ", round(result$expected_i, 4)),
+                          paste("- **Variance:** ", round(result$variance_i, 6)),
+                          paste("- **Z-Score:** ", round(result$z_score, 4)),
+                          paste("- **P-Value:** ", format_pvalue(result$p_value)),
+                          paste("- **Significance:** ", interpret_significance(result$p_value)),
+                          ""
+      )
+      
+      # Spatial interpretation
+      if (result$p_value < 0.05) {
+        if (result$morans_i > result$expected_i) {
+          pattern_type <- "AUTOKORELASI SPASIAL POSITIF SIGNIFIKAN"
+          pattern_desc <- "Data cenderung bercluster atau berkelompok secara spasial. Wilayah dengan nilai tinggi dikelilingi oleh wilayah dengan nilai tinggi, dan sebaliknya."
+        } else {
+          pattern_type <- "AUTOKORELASI SPASIAL NEGATIF SIGNIFIKAN"
+          pattern_desc <- "Data menunjukkan pola checkerboard dimana wilayah dengan nilai tinggi dikelilingi oleh wilayah dengan nilai rendah."
+        }
+      } else {
+        pattern_type <- "TIDAK ADA AUTOKORELASI SPASIAL SIGNIFIKAN"
+        pattern_desc <- "Data tersebar secara acak tanpa pola spasial yang jelas."
+      }
+      
+      report_content <- c(report_content,
+                          "## Interpretasi Pola Spasial",
+                          "",
+                          paste("**Pola Terdeteksi:** ", pattern_type),
+                          "",
+                          paste("**Deskripsi:** ", pattern_desc),
+                          "",
+                          "**Implikasi:**",
+                          "",
+                          "- Moran's I berkisar dari -1 (dispersi sempurna) hingga +1 (clustering sempurna)",
+                          "- Nilai mendekati 0 menunjukkan pola acak",
+                          "- Hasil ini penting untuk memahami pola geografis kerentanan sosial",
+                          ""
+      )
+    }
+    
+    # Final Conclusions
+    report_content <- c(report_content,
+                        "",
+                        "\\newpage",
+                        "",
+                        "# KESIMPULAN DAN REKOMENDASI",
+                        "",
+                        "## Ringkasan Temuan Utama",
+                        "",
+                        "Berdasarkan analisis statistik komprehensif yang telah dilakukan terhadap dataset Social Vulnerability Index (SoVI), beberapa temuan utama dapat disimpulkan:",
+                        ""
+    )
+    
+    # Add specific conclusions based on completed analyses
+    conclusion_points <- c()
+    
+    if (values$desc_generated) {
+      conclusion_points <- c(conclusion_points, "1. **Analisis Deskriptif:** Karakteristik distribusi data telah diidentifikasi dengan detail statistik yang komprehensif")
+    }
+    
+    if (values$viz_generated) {
+      conclusion_points <- c(conclusion_points, "2. **Visualisasi Multivariat:** Pola hubungan antar variabel telah divisualisasikan untuk memahami struktur data")
+    }
+    
+    if (values$map_generated) {
+      conclusion_points <- c(conclusion_points, "3. **Distribusi Spasial:** Pola geografis kerentanan sosial telah dipetakan untuk identifikasi area prioritas")
+    }
+    
+    if (values$normality_done || values$homogeneity_done) {
+      conclusion_points <- c(conclusion_points, "4. **Validasi Asumsi:** Asumsi statistik telah diuji untuk memastikan validitas analisis lanjutan")
+    }
+    
+    if (values$ttest_done) {
+      conclusion_points <- c(conclusion_points, "5. **Uji Beda Rata-rata:** Perbedaan signifikan antar grup telah diidentifikasi")
+    }
+    
+    if (values$anova_done) {
+      conclusion_points <- c(conclusion_points, "6. **ANOVA:** Analisis varians telah mengidentifikasi faktor-faktor yang berpengaruh signifikan")
+    }
+    
+    if (values$regression_done) {
+      conclusion_points <- c(conclusion_points, "7. **Regresi Linear:** Model prediktif telah dikembangkan untuk memahami hubungan antar variabel")
+    }
+    
+    if (values$spatial_done) {
+      conclusion_points <- c(conclusion_points, "8. **Analisis Spasial:** Pola autokorelasi spasial telah dianalisis untuk memahami clustering geografis")
+    }
+    
+    report_content <- c(report_content, conclusion_points, "")
+    
+    # General recommendations
+    report_content <- c(report_content,
+                        "## Rekomendasi Umum",
+                        "",
+                        "1. **Validasi Hasil:** Lakukan validasi silang untuk memastikan robustness temuan",
+                        "2. **Analisis Lanjutan:** Pertimbangkan metode machine learning untuk analisis prediktif yang lebih kompleks",
+                        "3. **Implementasi Kebijakan:** Gunakan temuan spasial untuk targeting program intervensi",
+                        "4. **Monitoring Berkelanjutan:** Lakukan pemantauan berkala untuk tracking perubahan pola kerentanan",
+                        "5. **Integrasi Data:** Pertimbangkan integrasi dengan data sekunder untuk analisis yang lebih komprehensif",
+                        "",
+                        "## Limitasi Penelitian",
+                        "",
+                        "1. **Data Cross-sectional:** Analisis ini menggunakan data cross-sectional sehingga tidak dapat menangkap perubahan temporal",
+                        "2. **Koordinat Sintetis:** Koordinat geografis yang digunakan bersifat sintetis untuk keperluan demonstrasi",
+                        "3. **Asumsi Model:** Hasil analisis bergantung pada terpenuhinya asumsi-asumsi statistik yang telah diuji",
+                        "",
+                        "---",
+                        "",
+                        "**Laporan ini dibuat secara otomatis oleh WASKITA Dashboard**",
+                        "",
+                        paste("*Generated on:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "WIB*"),
+                        "",
+                        "**Referensi:**",
+                        "",
+                        "- Dataset: Social Vulnerability Index (SoVI)",
+                        "- Journal: Data in Brief, Elsevier",
+                        "- DOI: 10.1016/j.dib.2021.107618",
+                        "- Platform: WASKITA Dashboard - Wawasan Spasial Kerentanan Interaktif & Terpadu Analitik"
+    )
+    
+    return(report_content)
+  }
+  
+  # =============================================================================
+  # COMPREHENSIVE REPORT DOWNLOAD HANDLERS
+  # =============================================================================
+  
+  # Generate Comprehensive PDF Report
+  output$generate_comprehensive_report_pdf <- downloadHandler(
     filename = function() {
-      paste0("WASKITA_Activity_Report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf")
+      paste0("WASKITA_Comprehensive_Report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf")
     },
     content = function(file) {
       # Show progress notification
-      showNotification("Generating comprehensive activity report (PDF)...", type = "message", duration = NULL, id = "activity_pdf_progress")
+      showNotification("Generating comprehensive PDF report...", type = "message", duration = NULL, id = "pdf_progress")
       
       tryCatch({
         # Create temporary Rmd file
         temp_rmd <- tempfile(fileext = ".Rmd")
         
-        # Generate comprehensive report content based on all activities
-        report_content <- generate_comprehensive_activity_report(activity_tracker, values$processed_data)
+        # Generate comprehensive report content
+        report_content <- generate_comprehensive_rmd_report()
         
         # Write content to file
         writeLines(report_content, temp_rmd)
@@ -3226,7 +3475,7 @@ server <- function(input, output, session) {
           temp_rmd, 
           output_format = rmarkdown::pdf_document(
             toc = TRUE,
-            toc_depth = 4,
+            toc_depth = 3,
             number_sections = TRUE,
             latex_engine = "xelatex"
           ),
@@ -3236,31 +3485,31 @@ server <- function(input, output, session) {
         )
         
         # Remove progress notification and show success
-        removeNotification("activity_pdf_progress")
-        showNotification("Activity report PDF generated successfully!", type = "success", duration = 5)
+        removeNotification("pdf_progress")
+        showNotification("Comprehensive PDF report generated successfully!", type = "success", duration = 5)
         
       }, error = function(e) {
-        removeNotification("activity_pdf_progress")
-        showNotification(paste("Error generating activity PDF report:", e$message), type = "error", duration = 10)
+        removeNotification("pdf_progress")
+        showNotification(paste("Error generating PDF report:", e$message), type = "error", duration = 10)
       })
     }
   )
   
-  # Generate Activity Report Word
-  output$generate_activity_report_word <- downloadHandler(
+  # Generate Comprehensive Word Report
+  output$generate_comprehensive_report_word <- downloadHandler(
     filename = function() {
-      paste0("WASKITA_Activity_Report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
+      paste0("WASKITA_Comprehensive_Report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
     },
     content = function(file) {
       # Show progress notification
-      showNotification("Generating comprehensive activity report (Word)...", type = "message", duration = NULL, id = "activity_word_progress")
+      showNotification("Generating comprehensive Word report...", type = "message", duration = NULL, id = "word_progress")
       
       tryCatch({
         # Create temporary Rmd file
         temp_rmd <- tempfile(fileext = ".Rmd")
         
-        # Generate comprehensive report content based on all activities
-        report_content <- generate_comprehensive_activity_report(activity_tracker, values$processed_data)
+        # Generate comprehensive report content
+        report_content <- generate_comprehensive_rmd_report()
         
         # Write content to file
         writeLines(report_content, temp_rmd)
@@ -3270,7 +3519,7 @@ server <- function(input, output, session) {
           temp_rmd, 
           output_format = rmarkdown::word_document(
             toc = TRUE,
-            toc_depth = 4
+            toc_depth = 3
           ),
           output_file = file,
           quiet = TRUE,
@@ -3278,103 +3527,18 @@ server <- function(input, output, session) {
         )
         
         # Remove progress notification and show success
-        removeNotification("activity_word_progress")
-        showNotification("Activity report Word generated successfully!", type = "success", duration = 5)
+        removeNotification("word_progress")
+        showNotification("Comprehensive Word report generated successfully!", type = "success", duration = 5)
         
       }, error = function(e) {
-        removeNotification("activity_word_progress")
-        showNotification(paste("Error generating activity Word report:", e$message), type = "error", duration = 10)
-      })
-    }
-  )
-  
-  # Download activity report from beranda
-  output$download_activity_report_pdf <- downloadHandler(
-    filename = function() {
-      paste0("WASKITA_Activity_Report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf")
-    },
-    content = function(file) {
-      # Show progress notification
-      showNotification("Generating activity report PDF...", type = "message", duration = NULL, id = "beranda_pdf_progress")
-      
-      tryCatch({
-        # Create temporary Rmd file
-        temp_rmd <- tempfile(fileext = ".Rmd")
-        
-        # Generate comprehensive report content based on all activities
-        report_content <- generate_comprehensive_activity_report(activity_tracker, values$processed_data)
-        
-        # Write content to file
-        writeLines(report_content, temp_rmd)
-        
-        # Render to PDF
-        rmarkdown::render(
-          temp_rmd, 
-          output_format = rmarkdown::pdf_document(
-            toc = TRUE,
-            toc_depth = 4,
-            number_sections = TRUE,
-            latex_engine = "xelatex"
-          ),
-          output_file = file,
-          quiet = TRUE,
-          envir = new.env()
-        )
-        
-        # Remove progress notification and show success
-        removeNotification("beranda_pdf_progress")
-        showNotification("Activity report PDF generated successfully!", type = "success", duration = 5)
-        
-      }, error = function(e) {
-        removeNotification("beranda_pdf_progress")
-        showNotification(paste("Error generating activity PDF report:", e$message), type = "error", duration = 10)
-      })
-    }
-  )
-  
-  output$download_activity_report_word <- downloadHandler(
-    filename = function() {
-      paste0("WASKITA_Activity_Report_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".docx")
-    },
-    content = function(file) {
-      # Show progress notification
-      showNotification("Generating activity report Word...", type = "message", duration = NULL, id = "beranda_word_progress")
-      
-      tryCatch({
-        # Create temporary Rmd file
-        temp_rmd <- tempfile(fileext = ".Rmd")
-        
-        # Generate comprehensive report content based on all activities
-        report_content <- generate_comprehensive_activity_report(activity_tracker, values$processed_data)
-        
-        # Write content to file
-        writeLines(report_content, temp_rmd)
-        
-        # Render to Word
-        rmarkdown::render(
-          temp_rmd, 
-          output_format = rmarkdown::word_document(
-            toc = TRUE,
-            toc_depth = 4
-          ),
-          output_file = file,
-          quiet = TRUE,
-          envir = new.env()
-        )
-        
-        # Remove progress notification and show success
-        removeNotification("beranda_word_progress")
-        showNotification("Activity report Word generated successfully!", type = "success", duration = 5)
-        
-      }, error = function(e) {
-        removeNotification("beranda_word_progress")
-        showNotification(paste("Error generating activity Word report:", e$message), type = "error", duration = 10)
+        removeNotification("word_progress")
+        showNotification(paste("Error generating Word report:", e$message), type = "error", duration = 10)
       })
     }
   )
   
   # =============================================================================
-  # DOWNLOAD HANDLERS - ENHANCED WITH ACTIVITY TRACKING
+  # DOWNLOAD HANDLERS
   # =============================================================================
   
   # Download original data
@@ -3385,18 +3549,6 @@ server <- function(input, output, session) {
     content = function(file) {
       if (!is.null(values$original_data)) {
         write.csv(values$original_data, file, row.names = FALSE)
-        
-        # Add to activity tracker
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download Original Data",
-          content = paste(
-            "Data asli telah didownload dalam format CSV",
-            paste("Ukuran file:", nrow(values$original_data), "baris x", ncol(values$original_data), "kolom"),
-            paste("Timestamp download:", Sys.time()),
-            sep = "\n"
-          )
-        )
       }
     }
   )
@@ -3409,20 +3561,6 @@ server <- function(input, output, session) {
     content = function(file) {
       if (!is.null(values$processed_data)) {
         write.csv(values$processed_data, file, row.names = FALSE)
-        
-        # Add to activity tracker
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download Processed Data",
-          content = paste(
-            "Data yang telah diproses didownload dalam format CSV",
-            paste("Ukuran file:", nrow(values$processed_data), "baris x", ncol(values$processed_data), "kolom"),
-            paste("Transformasi yang diterapkan:", if(values$transformation_done) "Ya" else "Tidak"),
-            paste("Kategorisasi yang diterapkan:", if(values$categorization_done) "Ya" else "Tidak"),
-            paste("Timestamp download:", Sys.time()),
-            sep = "\n"
-          )
-        )
       }
     }
   )
@@ -3480,19 +3618,6 @@ server <- function(input, output, session) {
         }
         
         ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
-        
-        # Add to activity tracker
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download Descriptive Plot",
-          content = paste(
-            paste("Plot deskriptif untuk variabel:", values$current_desc_variable),
-            paste("Jenis plot:", input$desc_chart_type),
-            paste("Format file: PNG (300 DPI)"),
-            paste("Timestamp download:", Sys.time()),
-            sep = "\n"
-          )
-        )
       }
     }
   )
@@ -3532,18 +3657,6 @@ server <- function(input, output, session) {
         }
         
         write.csv(stats_df, file, row.names = FALSE)
-        
-        # Add to activity tracker
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download Descriptive Statistics",
-          content = paste(
-            paste("Statistik deskriptif untuk variabel:", values$current_desc_variable),
-            paste("Format file: CSV"),
-            paste("Timestamp download:", Sys.time()),
-            sep = "\n"
-          )
-        )
       }
     }
   )
@@ -3567,18 +3680,6 @@ server <- function(input, output, session) {
                         output_format = "pdf_document",
                         output_file = file,
                         quiet = TRUE)
-      
-      # Add to activity tracker
-      add_activity_to_tracker(
-        type = "analysis",
-        title = "Download Descriptive Analysis Report",
-        content = paste(
-          paste("Laporan analisis deskriptif untuk variabel:", values$current_desc_variable),
-          paste("Format file: PDF"),
-          paste("Timestamp download:", Sys.time()),
-          sep = "\n"
-        )
-      )
     }
   )
   
@@ -3629,18 +3730,6 @@ server <- function(input, output, session) {
         
         if (!is.null(p)) {
           ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
-          
-          # Add to activity tracker
-          add_activity_to_tracker(
-            type = "analysis",
-            title = "Download Visualization Plot",
-            content = paste(
-              paste("Plot visualisasi jenis:", values$current_viz_type),
-              paste("Format file: PNG (300 DPI)"),
-              paste("Timestamp download:", Sys.time()),
-              sep = "\n"
-            )
-          )
         }
       }
     }
@@ -3665,116 +3754,70 @@ server <- function(input, output, session) {
                         output_format = "pdf_document",
                         output_file = file,
                         quiet = TRUE)
-      
-      # Add to activity tracker
-      add_activity_to_tracker(
-        type = "analysis",
-        title = "Download Visualization Report",
-        content = paste(
-          paste("Laporan visualisasi jenis:", values$current_viz_type),
-          paste("Format file: PDF"),
-          paste("Timestamp download:", Sys.time()),
-          sep = "\n"
-        )
-      )
     }
   )
   
-  # Download map image
+  # Download full report PDF
+  output$download_full_report_pdf <- downloadHandler(
+    filename = function() {
+      create_download_filename("full_report", "pdf")
+    },
+    content = function(file) {
+      # Create temporary Rmd file
+      temp_rmd <- tempfile(fileext = ".Rmd")
+      
+      # Generate report content
+      report_content <- generate_full_report_content()
+      
+      writeLines(report_content, temp_rmd)
+      
+      # Render to PDF
+      rmarkdown::render(temp_rmd, 
+                        output_format = "pdf_document",
+                        output_file = file,
+                        quiet = TRUE)
+    }
+  )
+  
+  # Download full report Word
+  output$download_full_report_word <- downloadHandler(
+    filename = function() {
+      create_download_filename("full_report", "docx")
+    },
+    content = function(file) {
+      # Create temporary Rmd file
+      temp_rmd <- tempfile(fileext = ".Rmd")
+      
+      # Generate report content
+      report_content <- generate_full_report_content()
+      
+      writeLines(report_content, temp_rmd)
+      
+      # Render to Word
+      rmarkdown::render(temp_rmd, 
+                        output_format = "word_document",
+                        output_file = file,
+                        quiet = TRUE)
+    }
+  )
+  
+  # Additional download handlers for other sections
   output$download_map_image <- downloadHandler(
     filename = function() {
       create_download_filename("spatial_map", "png")
     },
     content = function(file) {
       # Create a static version of the map for download
-      if (values$map_generated && !is.null(input$map_variable)) {
+      if (values$map_generated && !is.null(values$map_data)) {
+        # Create a simple ggplot version of the map
+        p <- ggplot(values$map_data, aes(x = lon, y = lat, color = value)) +
+          geom_point(size = 2, alpha = 0.7) +
+          scale_color_viridis_c(name = input$map_variable) +
+          labs(title = paste("Spatial Distribution:", input$map_variable),
+               x = "Longitude", y = "Latitude") +
+          theme_waskita()
         
-        if (!is.null(values$indonesia_sf)) {
-          # Try to create a static map using ggplot with sf data
-          tryCatch({
-            merged_data <- create_choropleth_data(values$processed_data, values$indonesia_sf, input$map_variable)
-            
-            if (!is.null(merged_data) && input$map_variable %in% names(merged_data)) {
-              p <- ggplot(merged_data) +
-                geom_sf(aes_string(fill = input$map_variable), color = "white", size = 0.1) +
-                scale_fill_viridis_c(name = input$map_variable, option = input$color_palette) +
-                labs(title = paste("Peta Indonesia:", input$map_variable),
-                     subtitle = paste("Tipe:", input$map_type, "| Skema warna:", input$color_palette)) +
-                theme_void() +
-                theme(
-                  plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-                  plot.subtitle = element_text(hjust = 0.5, size = 12),
-                  legend.position = "bottom"
-                )
-              
-              ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
-            } else {
-              # Fallback to point map
-              var_data <- values$processed_data[[input$map_variable]]
-              map_data <- data.frame(
-                lat = runif(length(var_data), -11, 6),
-                lon = runif(length(var_data), 95, 141),
-                value = var_data
-              )
-              
-              p <- ggplot(map_data, aes(x = lon, y = lat, color = value)) +
-                geom_point(size = 2, alpha = 0.7) +
-                scale_color_viridis_c(name = input$map_variable, option = input$color_palette) +
-                labs(title = paste("Spatial Distribution:", input$map_variable),
-                     x = "Longitude", y = "Latitude") +
-                theme_waskita()
-              
-              ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
-            }
-          }, error = function(e) {
-            # Final fallback
-            var_data <- values$processed_data[[input$map_variable]]
-            map_data <- data.frame(
-              lat = runif(length(var_data), -11, 6),
-              lon = runif(length(var_data), 95, 141),
-              value = var_data
-            )
-            
-            p <- ggplot(map_data, aes(x = lon, y = lat, color = value)) +
-              geom_point(size = 2, alpha = 0.7) +
-              scale_color_viridis_c(name = input$map_variable) +
-              labs(title = paste("Spatial Distribution:", input$map_variable),
-                   x = "Longitude", y = "Latitude") +
-              theme_waskita()
-            
-            ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
-          })
-        } else {
-          # Use synthetic point data
-          var_data <- values$processed_data[[input$map_variable]]
-          map_data <- data.frame(
-            lat = runif(length(var_data), -11, 6),
-            lon = runif(length(var_data), 95, 141),
-            value = var_data
-          )
-          
-          p <- ggplot(map_data, aes(x = lon, y = lat, color = value)) +
-            geom_point(size = 2, alpha = 0.7) +
-            scale_color_viridis_c(name = input$map_variable, option = input$color_palette) +
-            labs(title = paste("Spatial Distribution:", input$map_variable),
-                 x = "Longitude", y = "Latitude") +
-            theme_waskita()
-          
-          ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
-        }
-        
-        # Add to activity tracker
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download Spatial Map",
-          content = paste(
-            paste("Peta spasial untuk variabel:", input$map_variable),
-            paste("Tipe peta:", input$map_type),
-            paste("Format file: PNG (300 DPI)"),
-            paste("Timestamp download:", Sys.time()),
-            sep = "\n"
-          )
-        )
+        ggsave(file, plot = p, width = 12, height = 8, dpi = 300)
       }
     }
   )
@@ -3860,7 +3903,121 @@ server <- function(input, output, session) {
     return(content)
   }
   
-  # Placeholder download handlers for remaining buttons (enhanced with tracking)
+  # Generate full report content
+  generate_full_report_content <- function() {
+    content <- c(
+      "---",
+      "title: 'WASKITA Dashboard - Laporan Analisis Lengkap'",
+      "subtitle: 'Wawasan Spasial Kerentanan Interaktif & Terpadu Analitik'",
+      "author: 'Generated by WASKITA Dashboard'",
+      paste("date: '", Sys.Date(), "'"),
+      "output:",
+      "  pdf_document:",
+      "    toc: true",
+      "    toc_depth: 3",
+      "  word_document:",
+      "    toc: true",
+      "    toc_depth: 3",
+      "---",
+      "",
+      "# Executive Summary",
+      "",
+      "Laporan ini berisi analisis komprehensif dari dataset Social Vulnerability Index (SoVI) menggunakan platform WASKITA Dashboard.",
+      "",
+      "## Dataset Overview",
+      ""
+    )
+    
+    if (!is.null(values$processed_data)) {
+      content <- c(content,
+                   paste("- Total observasi:", nrow(values$processed_data)),
+                   paste("- Total variabel:", ncol(values$processed_data)),
+                   paste("- Missing values:", sum(is.na(values$processed_data))),
+                   paste("- Variabel numerik:", sum(sapply(values$processed_data, is.numeric))),
+                   paste("- Variabel kategorikal:", sum(sapply(values$processed_data, function(x) is.character(x) | is.factor(x)))),
+                   ""
+      )
+    }
+    
+    content <- c(content,
+                 "# Metadata Variabel",
+                 "",
+                 "Berikut adalah deskripsi lengkap variabel dalam dataset:",
+                 ""
+    )
+    
+    # Add metadata table
+    for (i in 1:nrow(sovi_metadata)) {
+      content <- c(content,
+                   paste("**", sovi_metadata$Variabel[i], "**:", sovi_metadata$Keterangan[i], 
+                         "(", sovi_metadata$Tipe_Data[i], ")")
+      )
+    }
+    
+    content <- c(content,
+                 "",
+                 "# Analisis yang Telah Dilakukan",
+                 ""
+    )
+    
+    if (values$desc_generated) {
+      content <- c(content,
+                   "## Analisis Deskriptif",
+                   paste("- Variabel yang dianalisis:", values$current_desc_variable),
+                   ""
+      )
+    }
+    
+    if (values$normality_done) {
+      content <- c(content,
+                   "## Uji Normalitas",
+                   paste("- Metode:", input$normality_test),
+                   paste("- Variabel:", input$normality_variable),
+                   ""
+      )
+    }
+    
+    if (values$ttest_done) {
+      content <- c(content,
+                   "## Uji t",
+                   paste("- Jenis:", input$ttest_type),
+                   paste("- Variabel:", input$ttest_variable),
+                   ""
+      )
+    }
+    
+    if (values$regression_done) {
+      content <- c(content,
+                   "## Analisis Regresi",
+                   paste("- Variabel dependen:", input$reg_dependent),
+                   paste("- Variabel independen:", paste(input$reg_independent, collapse = ", ")),
+                   ""
+      )
+    }
+    
+    if (values$spatial_done) {
+      content <- c(content,
+                   "## Analisis Spasial",
+                   paste("- Variabel:", input$spatial_variable),
+                   paste("- Metode weight:", input$weight_type),
+                   ""
+      )
+    }
+    
+    content <- c(content,
+                 "# Kesimpulan",
+                 "",
+                 "Analisis telah dilakukan menggunakan platform WASKITA Dashboard dengan berbagai metode statistik yang sesuai untuk data Social Vulnerability Index.",
+                 "",
+                 "---",
+                 "",
+                 "*Laporan ini dibuat secara otomatis oleh WASKITA Dashboard*"
+    )
+    
+    return(content)
+  }
+  
+  # Placeholder download handlers for remaining buttons
   output$download_assumptions_plot <- downloadHandler(
     filename = function() { create_download_filename("assumptions_plot", "png") },
     content = function(file) {
@@ -3872,12 +4029,6 @@ server <- function(input, output, session) {
           labs(title = "Q-Q Plot for Normality Test") +
           theme_waskita()
         ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
-        
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download Assumptions Plot",
-          content = paste("Q-Q plot untuk uji normalitas didownload", "Timestamp:", Sys.time(), sep = "\n")
-        )
       }
     }
   )
@@ -3894,12 +4045,6 @@ server <- function(input, output, session) {
           Significant = values$normality_result$p.value <= 0.05
         )
         write.csv(results_df, file, row.names = FALSE)
-        
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download Assumptions Results",
-          content = paste("Hasil uji asumsi didownload dalam format CSV", "Timestamp:", Sys.time(), sep = "\n")
-        )
       }
     }
   )
@@ -3920,16 +4065,10 @@ server <- function(input, output, session) {
       )
       writeLines(content, temp_rmd)
       rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      
-      add_activity_to_tracker(
-        type = "analysis",
-        title = "Download Assumptions Report",
-        content = paste("Laporan uji asumsi didownload dalam format PDF", "Timestamp:", Sys.time(), sep = "\n")
-      )
     }
   )
   
-  # Add similar enhanced handlers for other downloads
+  # Add similar placeholder handlers for other downloads
   output$download_ttest_plot <- downloadHandler(
     filename = function() { create_download_filename("ttest_plot", "png") },
     content = function(file) {
@@ -3939,12 +4078,6 @@ server <- function(input, output, session) {
           labs(title = "T-test Results") +
           theme_waskita()
         ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
-        
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download T-test Plot",
-          content = paste("Plot hasil uji t didownload", "Timestamp:", Sys.time(), sep = "\n")
-        )
       }
     }
   )
@@ -3962,12 +4095,6 @@ server <- function(input, output, session) {
           Significant = values$ttest_result$p.value <= 0.05
         )
         write.csv(results_df, file, row.names = FALSE)
-        
-        add_activity_to_tracker(
-          type = "analysis",
-          title = "Download T-test Results",
-          content = paste("Hasil uji t didownload dalam format CSV", "Timestamp:", Sys.time(), sep = "\n")
-        )
       }
     }
   )
@@ -3979,22 +4106,15 @@ server <- function(input, output, session) {
       content <- c("---", "title: 'T-test Report'", "output: pdf_document", "---", "", "# T-test Results", "", "This report contains the results of t-test analysis performed in WASKITA Dashboard.")
       writeLines(content, temp_rmd)
       rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      
-      add_activity_to_tracker(
-        type = "analysis",
-        title = "Download T-test Report",
-        content = paste("Laporan uji t didownload dalam format PDF", "Timestamp:", Sys.time(), sep = "\n")
-      )
     }
   )
   
-  # Add more enhanced placeholder handlers for remaining downloads
+  # Add more placeholder handlers
   output$download_propvar_plots <- downloadHandler(
     filename = function() { create_download_filename("propvar_plots", "png") },
     content = function(file) {
       p <- ggplot() + geom_blank() + labs(title = "Proportion & Variance Test Plots") + theme_waskita()
       ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
-      add_activity_to_tracker(type = "analysis", title = "Download Prop/Var Plots", content = paste("Plot uji proporsi/variance didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4003,7 +4123,6 @@ server <- function(input, output, session) {
     content = function(file) {
       results_df <- data.frame(Test = "Proportion/Variance", Status = "Completed")
       write.csv(results_df, file, row.names = FALSE)
-      add_activity_to_tracker(type = "analysis", title = "Download Prop/Var Results", content = paste("Hasil uji proporsi/variance didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4014,7 +4133,6 @@ server <- function(input, output, session) {
       content <- c("---", "title: 'Proportion & Variance Report'", "output: pdf_document", "---", "", "# Results")
       writeLines(content, temp_rmd)
       rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      add_activity_to_tracker(type = "analysis", title = "Download Prop/Var Report", content = paste("Laporan uji proporsi/variance didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4023,7 +4141,6 @@ server <- function(input, output, session) {
     content = function(file) {
       p <- ggplot() + geom_blank() + labs(title = "ANOVA Plots") + theme_waskita()
       ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
-      add_activity_to_tracker(type = "analysis", title = "Download ANOVA Plots", content = paste("Plot ANOVA didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4032,7 +4149,6 @@ server <- function(input, output, session) {
     content = function(file) {
       results_df <- data.frame(Test = "ANOVA", Status = "Completed")
       write.csv(results_df, file, row.names = FALSE)
-      add_activity_to_tracker(type = "analysis", title = "Download ANOVA Results", content = paste("Hasil ANOVA didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4043,7 +4159,6 @@ server <- function(input, output, session) {
       content <- c("---", "title: 'ANOVA Report'", "output: pdf_document", "---", "", "# Results")
       writeLines(content, temp_rmd)
       rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      add_activity_to_tracker(type = "analysis", title = "Download ANOVA Report", content = paste("Laporan ANOVA didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4052,7 +4167,6 @@ server <- function(input, output, session) {
     content = function(file) {
       p <- ggplot() + geom_blank() + labs(title = "Regression Plots") + theme_waskita()
       ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
-      add_activity_to_tracker(type = "analysis", title = "Download Regression Plots", content = paste("Plot regresi didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4061,7 +4175,6 @@ server <- function(input, output, session) {
     content = function(file) {
       results_df <- data.frame(Test = "Regression", Status = "Completed")
       write.csv(results_df, file, row.names = FALSE)
-      add_activity_to_tracker(type = "analysis", title = "Download Regression Results", content = paste("Hasil regresi didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4072,7 +4185,6 @@ server <- function(input, output, session) {
       content <- c("---", "title: 'Regression Report'", "output: pdf_document", "---", "", "# Results")
       writeLines(content, temp_rmd)
       rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      add_activity_to_tracker(type = "analysis", title = "Download Regression Report", content = paste("Laporan regresi didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4081,7 +4193,6 @@ server <- function(input, output, session) {
     content = function(file) {
       p <- ggplot() + geom_blank() + labs(title = "Spatial Analysis Plots") + theme_waskita()
       ggsave(file, plot = p, width = 10, height = 6, dpi = 300)
-      add_activity_to_tracker(type = "analysis", title = "Download Spatial Plots", content = paste("Plot analisis spasial didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4090,7 +4201,6 @@ server <- function(input, output, session) {
     content = function(file) {
       if (!is.null(values$distance_data)) {
         write.csv(values$distance_data, file, row.names = FALSE)
-        add_activity_to_tracker(type = "analysis", title = "Download Distance Matrix", content = paste("Matriks jarak didownload", "Timestamp:", Sys.time(), sep = "\n"))
       }
     }
   )
@@ -4102,7 +4212,6 @@ server <- function(input, output, session) {
       content <- c("---", "title: 'Spatial Analysis Report'", "output: pdf_document", "---", "", "# Results")
       writeLines(content, temp_rmd)
       rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      add_activity_to_tracker(type = "analysis", title = "Download Spatial Report", content = paste("Laporan analisis spasial didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   
@@ -4113,7 +4222,6 @@ server <- function(input, output, session) {
       content <- c("---", "title: 'Spatial Map Report'", "output: pdf_document", "---", "", "# Results")
       writeLines(content, temp_rmd)
       rmarkdown::render(temp_rmd, output_file = file, quiet = TRUE)
-      add_activity_to_tracker(type = "analysis", title = "Download Spatial Map Report", content = paste("Laporan peta spasial didownload", "Timestamp:", Sys.time(), sep = "\n"))
     }
   )
   

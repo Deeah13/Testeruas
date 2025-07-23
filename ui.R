@@ -859,13 +859,6 @@ ui <- dashboardPage(
   dashboardBody(
     custom_css,
     
-    # JavaScript for status updates
-    tags$script(HTML("
-      Shiny.addCustomMessageHandler('updateStatus', function(message) {
-        eval(message);
-      });
-    ")),
-    
     tabItems(
       # =============================================================================
       # TAB BERANDA
@@ -1072,14 +1065,14 @@ ui <- dashboardPage(
           fluidRow(
             column(12,
                    div(class = "download-section",
-                       h5("Download Laporan Aktivitas Lengkap"),
+                       h5("Download Laporan Lengkap"),
                        fluidRow(
                          column(6,
-                                downloadButton("download_activity_report_pdf", "Download Activity Report (PDF)",
+                                downloadButton("download_full_report_pdf", "Download Full Report (PDF)",
                                                class = "btn btn-primary", style = "width: 100%;")
                          ),
                          column(6,
-                                downloadButton("download_activity_report_word", "Download Activity Report (Word)",
+                                downloadButton("download_full_report_word", "Download Full Report (Word)",
                                                class = "btn btn-primary", style = "width: 100%;")
                          )
                        )
@@ -1090,13 +1083,13 @@ ui <- dashboardPage(
       ),
       
       # =============================================================================
-      # TAB LAPORAN LENGKAP (ENHANCED)
+      # TAB LAPORAN LENGKAP (NEW)
       # =============================================================================
       tabItem(
         tabName = "laporan_lengkap",
         
         box(
-          title = tagList(icon("file-pdf"), "Generator Laporan Aktivitas Komprehensif"),
+          title = tagList(icon("file-pdf"), "Generator Laporan Lengkap WASKITA"),
           status = "primary",
           solidHeader = TRUE,
           width = 12,
@@ -1108,18 +1101,18 @@ ui <- dashboardPage(
                        div(class = "report-icon",
                            tags$i(class = "fas fa-file-medical-alt")
                        ),
-                       h3(class = "report-title", "Laporan Aktivitas Analisis Komprehensif"),
+                       h3(class = "report-title", "Laporan Analisis Statistik Komprehensif"),
                        p(class = "report-description", 
-                         "Generate laporan PDF/Word lengkap yang berisi SEMUA aktivitas analisis yang telah Anda lakukan di platform WASKITA. Laporan akan mencakup transformasi data, visualisasi, uji statistik, analisis spasial, dan interpretasi ahli dengan format akademis yang profesional."),
+                         "Generate laporan PDF lengkap yang berisi semua hasil analisis statistik, visualisasi, dan interpretasi ahli dari semua fitur WASKITA Dashboard. Laporan akan disusun secara profesional dengan format akademis yang sesuai untuk penelitian dan publikasi ilmiah."),
                        
                        conditionalPanel(
                          condition = "output.data_loaded == true",
                          div(style = "margin: 20px 0;",
-                             downloadButton("generate_activity_report_pdf", 
-                                            HTML("<i class='fas fa-file-pdf'></i> Generate Laporan Aktivitas PDF"), 
+                             downloadButton("generate_comprehensive_report_pdf", 
+                                            HTML("<i class='fas fa-file-pdf'></i> Generate Laporan PDF Lengkap"), 
                                             class = "report-button"),
-                             downloadButton("generate_activity_report_word", 
-                                            HTML("<i class='fas fa-file-word'></i> Generate Laporan Aktivitas Word"), 
+                             downloadButton("generate_comprehensive_report_word", 
+                                            HTML("<i class='fas fa-file-word'></i> Generate Laporan Word Lengkap"), 
                                             class = "report-button")
                          )
                        ),
@@ -1140,9 +1133,9 @@ ui <- dashboardPage(
             condition = "output.data_loaded == true",
             fluidRow(
               column(12,
-                     h3("Status Aktivitas Analisis", 
+                     h3("Status Analisis yang Tersedia", 
                         style = paste0("color: ", waskita_colors$navy, "; text-align: center; margin: 40px 0 20px 0;")),
-                     p("Berikut adalah ringkasan semua aktivitas analisis yang telah dilakukan dan akan disertakan dalam laporan:",
+                     p("Berikut adalah ringkasan analisis yang telah dilakukan dan akan disertakan dalam laporan:",
                        style = paste0("color: ", waskita_colors$text_muted, "; text-align: center; margin-bottom: 30px;"))
               )
             ),
@@ -1249,18 +1242,17 @@ ui <- dashboardPage(
             fluidRow(
               column(12,
                      div(class = "interpretation-box", style = "margin: 40px 0;",
-                         h5(tags$i(class = "fas fa-info-circle"), " Fitur Laporan Aktivitas Lengkap"),
+                         h5(tags$i(class = "fas fa-info-circle"), " Fitur Laporan Lengkap"),
                          HTML("
                          <ul style='margin: 15px 0; padding-left: 20px;'>
-                           <li><strong>Executive Summary:</strong> Ringkasan eksekutif seluruh aktivitas analisis</li>
-                           <li><strong>Transformasi Data:</strong> Semua transformasi dan kategorisasi yang dilakukan</li>
-                           <li><strong>Visualisasi Lengkap:</strong> Semua grafik dan chart yang telah dibuat dengan interpretasinya</li>
-                           <li><strong>Uji Statistik Detail:</strong> Semua uji statistik dengan hasil dan interpretasi ahli</li>
-                           <li><strong>Analisis Spasial:</strong> Peta dan analisis autokorelasi yang telah dilakukan</li>
-                           <li><strong>Metodologi Komprehensif:</strong> Penjelasan setiap metode yang digunakan</li>
-                           <li><strong>Interpretasi Ahli:</strong> Penjelasan teknis dan praktis setiap hasil</li>
-                           <li><strong>Kesimpulan Terintegrasi:</strong> Ringkasan temuan dari semua analisis</li>
+                           <li><strong>Executive Summary:</strong> Ringkasan eksekutif hasil analisis</li>
+                           <li><strong>Metodologi Lengkap:</strong> Penjelasan metode statistik yang digunakan</li>
+                           <li><strong>Hasil Analisis Detail:</strong> Output statistik dengan interpretasi ahli</li>
+                           <li><strong>Visualisasi Berkualitas Tinggi:</strong> Grafik dan chart dengan resolusi publikasi</li>
+                           <li><strong>Interpretasi Statistik:</strong> Penjelasan teknis dan praktis setiap hasil</li>
+                           <li><strong>Kesimpulan dan Rekomendasi:</strong> Implikasi temuan untuk kebijakan</li>
                            <li><strong>Referensi dan Metadata:</strong> Informasi sumber data dan metodologi</li>
+                           <li><strong>Appendix:</strong> Data tambahan dan output statistik lengkap</li>
                          </ul>
                          ")
                      )
@@ -1308,10 +1300,10 @@ ui <- dashboardPage(
                          
                          fluidRow(
                            column(6,
-                                  checkboxInput("include_all_activities", "Sertakan Semua Aktivitas", value = TRUE)
+                                  checkboxInput("include_raw_output", "Sertakan Output Mentah R", value = FALSE)
                            ),
                            column(6,
-                                  checkboxInput("include_timestamps", "Sertakan Timestamp Aktivitas", value = TRUE)
+                                  checkboxInput("include_code_snippets", "Sertakan Code Snippets", value = FALSE)
                            )
                          )
                      )
@@ -1322,7 +1314,7 @@ ui <- dashboardPage(
       ),
       
       # =============================================================================
-      # TAB MANAJEMEN DATA - ENHANCED WITH TRACKING
+      # TAB MANAJEMEN DATA
       # =============================================================================
       tabItem(
         tabName = "manajemen_data",
@@ -1342,7 +1334,7 @@ ui <- dashboardPage(
                        ),
                        h3(class = "load-data-title", "Load Dataset WASKITA"),
                        p(class = "load-data-description", 
-                         "Memuat dataset Social Vulnerability Index (SoVI), matriks jarak, dan data geografis Indonesia untuk analisis spasial. Data akan dimuat dari sumber lokal atau backup online."),
+                         "Memuat dataset Social Vulnerability Index (SoVI) dan matriks jarak untuk analisis spasial. Data akan dimuat dari sumber lokal atau backup online."),
                        br(),
                        actionButton("load_data", 
                                     HTML("<i class='fas fa-play'></i> Mulai Load Dataset"), 
@@ -1451,7 +1443,7 @@ ui <- dashboardPage(
       ),
       
       # =============================================================================
-      # TAB EKSPLORASI DATA - DESKRIPTIF - ENHANCED WITH TRACKING
+      # TAB EKSPLORASI DATA - DESKRIPTIF
       # =============================================================================
       tabItem(
         tabName = "deskriptif",
@@ -1556,7 +1548,7 @@ ui <- dashboardPage(
       ),
       
       # =============================================================================
-      # TAB EKSPLORASI DATA - VISUALISASI - ENHANCED WITH TRACKING
+      # TAB EKSPLORASI DATA - VISUALISASI
       # =============================================================================
       tabItem(
         tabName = "visualisasi",
@@ -1650,13 +1642,13 @@ ui <- dashboardPage(
       ),
       
       # =============================================================================
-      # TAB EKSPLORASI DATA - PETA SPASIAL - ENHANCED WITH GEOJSON
+      # TAB EKSPLORASI DATA - PETA SPASIAL
       # =============================================================================
       tabItem(
         tabName = "peta_spasial",
         
         box(
-          title = tagList(icon("map"), "Peta Distribusi Spasial Indonesia"),
+          title = tagList(icon("map"), "Peta Distribusi Spasial"),
           status = "primary",
           solidHeader = TRUE,
           width = 12,
@@ -1671,7 +1663,7 @@ ui <- dashboardPage(
                      
                      selectInput("map_type", "Tipe Peta:",
                                  choices = list(
-                                   "Choropleth Indonesia" = "choropleth",
+                                   "Choropleth" = "choropleth",
                                    "Point Map" = "point",
                                    "Heat Map" = "heat"
                                  ), width = "100%"),
@@ -1681,9 +1673,7 @@ ui <- dashboardPage(
                                    "Viridis" = "viridis",
                                    "Blues" = "Blues",
                                    "Reds" = "Reds",
-                                   "Greens" = "Greens",
-                                   "Plasma" = "plasma",
-                                   "Inferno" = "inferno"
+                                   "Greens" = "Greens"
                                  ), width = "100%"),
                      
                      numericInput("map_bins", "Jumlah Kelas:",
@@ -1747,10 +1737,8 @@ ui <- dashboardPage(
       ),
       
       # =============================================================================
-      # OTHER TABS REMAIN THE SAME WITH ENHANCED TRACKING
-      # =============================================================================
-      
       # TAB UJI ASUMSI DATA
+      # =============================================================================
       tabItem(
         tabName = "uji_asumsi",
         
@@ -1860,7 +1848,9 @@ ui <- dashboardPage(
         )
       ),
       
+      # =============================================================================
       # TAB UJI BEDA RATA-RATA
+      # =============================================================================
       tabItem(
         tabName = "uji_rata_rata",
         
@@ -1980,7 +1970,9 @@ ui <- dashboardPage(
         )
       ),
       
+      # =============================================================================
       # TAB UJI PROPORSI & VARIANCE
+      # =============================================================================
       tabItem(
         tabName = "uji_proporsi",
         
@@ -2121,7 +2113,9 @@ ui <- dashboardPage(
         )
       ),
       
+      # =============================================================================
       # TAB ANOVA
+      # =============================================================================
       tabItem(
         tabName = "anova",
         
@@ -2229,7 +2223,9 @@ ui <- dashboardPage(
         )
       ),
       
+      # =============================================================================
       # TAB REGRESI LINEAR
+      # =============================================================================
       tabItem(
         tabName = "regresi",
         
@@ -2366,7 +2362,9 @@ ui <- dashboardPage(
         )
       ),
       
+      # =============================================================================
       # TAB ANALISIS SPASIAL
+      # =============================================================================
       tabItem(
         tabName = "analisis_spasial",
         
