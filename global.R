@@ -18,12 +18,12 @@ required_packages <- c(
 
 options (repos = c(CRAN = "https://cran.rstudio.com/"))
 # Install missing packages automatically
-#missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
-#if(length(missing_packages)) install.packages(missing_packages, dependencies = TRUE)
+missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
+if(length(missing_packages)) install.packages(missing_packages, dependencies = TRUE)
 
 for (pkg in required_packages) {
   if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
-    #install.packages(pkg, dependencies = TRUE)
+    install.packages(pkg, dependencies = TRUE)
     library(pkg, character.only = TRUE)
   }
 }
