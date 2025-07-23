@@ -3233,8 +3233,14 @@
     "data/sovi_data.csv": {
       "checksum": "af8c7713e2e92c2a4cae9186c3d8d722"
     },
+    "distance.csv": {
+      "checksum": "e2515d8640946056879d877b0a32cf71"
+    },
     "global.R": {
-      "checksum": "bf7207b1daf4024b5d7db89356796ef4"
+      "checksum": "669ff8f7f8d2e213f3727fb36809c76b"
+    },
+    "indonesia511.geojson": {
+      "checksum": "fc5ef83abeb409fd4ab283f00d7de530"
     },
     "Pakta Integritas UAS Komputasi Statistik_Diah Ayu Nur Rahmadani.docx": {
       "checksum": "e9411f4dc424231dc52a31a8e12b4798"
@@ -3244,6 +3250,9 @@
     },
     "server.R": {
       "checksum": "d883bd910f71657e11d071bf498d72b0"
+    },
+    "sovi_data.csv": {
+      "checksum": "af8c7713e2e92c2a4cae9186c3d8d722"
     },
     "ui.R": {
       "checksum": "273ad058155adb49134093bbe5855445"

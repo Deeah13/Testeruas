@@ -47,15 +47,13 @@ waskita_colors <- list(
   error = "#ef4444"        # Error color
 )
 
-# Path Konfigurasi Data
-local_data_dir <- "D:/Perkuliahan Tingkat 2 Semester 4/WASKITA2/data"
-local_sovi_path <- file.path(local_data_dir, "sovi_data.csv")
-local_distance_path <- file.path(local_data_dir, "distance.csv")
+local_sovi_path <- file.path("sovi_data.csv")
+local_distance_path <- file.path("distance.csv")
 
 # Backup URLs jika data lokal tidak tersedia
 backup_urls <- list(
   sovi = "https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/sovi_data.csv",
-  distance = "https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/distance.csv",
+  distance = "https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/distance.csv"
 )
 
 # =============================================================================
