@@ -18,12 +18,12 @@ required_packages <- c(
 
 options (repos = c(CRAN = "https://cran.rstudio.com/"))
 # Install missing packages automatically
-missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
-if(length(missing_packages)) install.packages(missing_packages, dependencies = TRUE)
+#missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
+#if(length(missing_packages)) install.packages(missing_packages, dependencies = TRUE)
 
 for (pkg in required_packages) {
   if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
-    install.packages(pkg, dependencies = TRUE)
+    #install.packages(pkg, dependencies = TRUE)
     library(pkg, character.only = TRUE)
   }
 }
@@ -51,13 +51,11 @@ waskita_colors <- list(
 local_data_dir <- "D:/Perkuliahan Tingkat 2 Semester 4/WASKITA2/data"
 local_sovi_path <- file.path(local_data_dir, "sovi_data.csv")
 local_distance_path <- file.path(local_data_dir, "distance.csv")
-local_geojson_path <- file.path(local_data_dir, "indonesia511.geojson")
 
 # Backup URLs jika data lokal tidak tersedia
 backup_urls <- list(
   sovi = "https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/sovi_data.csv",
   distance = "https://raw.githubusercontent.com/bmlmcmc/naspaclust/main/data/distance.csv",
-  geojson = "https://raw.githubusercontent.com/superpikar/indonesia-geojson/master/indonesia.geojson"
 )
 
 # =============================================================================
