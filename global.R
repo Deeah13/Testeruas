@@ -12,7 +12,7 @@ required_packages <- c(
   "corrplot", "RColorBrewer", "viridis", "scales",
   "knitr", "rmarkdown", "officer", "flextable",
   "htmltools", "htmlwidgets", "webshot",
-  "MASS", "forecast", "broom"
+  "MASS", "forecast", "broom", "rsconnect"
 )
 
 # Install missing packages automatically
@@ -25,7 +25,7 @@ for (pkg in required_packages) {
     library(pkg, character.only = TRUE)
   #}
 }
-
+writeManifest()
 # =============================================================================
 # KONFIGURASI GLOBAL
 # =============================================================================

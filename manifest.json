@@ -3502,7 +3502,7 @@
       "checksum": "e2515d8640946056879d877b0a32cf71"
     },
     "global.R": {
-      "checksum": "c33040c747cf81b5bc87ba43970bad1b"
+      "checksum": "25717a884186a47481f290aefb2b3836"
     },
     "Pakta Integritas UAS Komputasi Statistik_Diah Ayu Nur Rahmadani.docx": {
       "checksum": "e9411f4dc424231dc52a31a8e12b4798"
@@ -3511,13 +3511,13 @@
       "checksum": "d3f606273f07aaabe56ade8a50505170"
     },
     "server.R": {
-      "checksum": "d883bd910f71657e11d071bf498d72b0"
+      "checksum": "f8f12450f6312ad852fa151a013982eb"
     },
     "sovi_data.csv": {
       "checksum": "af8c7713e2e92c2a4cae9186c3d8d722"
     },
     "ui.R": {
-      "checksum": "273ad058155adb49134093bbe5855445"
+      "checksum": "c46400375b3791560864bcd36c37b414"
     }
   },
   "users": null
